@@ -1,0 +1,23 @@
+---
+title: "breast_cancer_wisconsin"
+author: "Brandon Chanderban"
+format: html
+editor: visual
+---
+
+# Introduction
+
+For the purpose of this analytics venture, the Breast Cancer Wisconsin (Original) Dataset from the UCI Machine Learning Repository will be utilized. It includes various features derived from digitized images of breast tissue samples. The hypothetical objective is to classify tumors as either benign or malignant based upon cell characteristics.
+
+## The Breast Cancer Wisconsin (Original) Dataset
+
+Source: [UCI ML Repository – Breast Cancer Dataset](https://archive.ics.uci.edu/dataset/15/breast+cancer+wisconsin+original)
+
+## Planned Approach
+
+I aim to download the dataset and then upload it to my GitHub repository. This dataset will then be loaded into R via its URL. The next stages will involve cleaning and transforming the data to focus on a subset of the most relevant features for predicting cancer type (either benign or malignant). Specifically, I'll:
+
+-   Attempt to rename columns to make them more interpretable
+-   Recode the target variables from numeric to "benign" and "malignant"
+-   Have to handle missing values, which are encoded within the dataset as "?"
+-   Select a subset of the most predictive features for the final dataset (for instance, the top 6 based on researched correlation)
