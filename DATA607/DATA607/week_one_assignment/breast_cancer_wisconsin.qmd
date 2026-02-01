@@ -17,7 +17,124 @@ Source: [UCI ML Repository – Breast Cancer Dataset](https://archive.ics.uci.ed
 
 I aim to download the dataset and then upload it to my GitHub repository. This dataset will then be loaded into R via its URL. The next stages will involve cleaning and transforming the data to focus on a subset of the most relevant features for predicting cancer type (either benign or malignant). Specifically, I'll:
 
--   Attempt to rename columns to make them more interpretable
 -   Recode the target variables from numeric to "benign" and "malignant"
 -   Have to handle missing values, which are encoded within the dataset as "?"
 -   Select a subset of the most predictive features for the final dataset (for instance, the top 6 based on researched correlation)
+
+Although this dataset focuses on breast cancer, my interest in cancer analytics was sparked by a recent article discussing advances in pancreatic cancer treatment. You can read more [here.](https://nypost.com/2026/01/30/health/pancreatic-cancer-breakthrough-tumors-disappear-in-mice/)
+
+## Code Base
+
+Loading libraries to be utilized.
+
+```{r load-libraries}
+
+library(dplyr)
+library(gt)
+
+```
+
+The next step entails assigning the raw URL of the breast cancer dataset (within my GitHub repo) to a variable named "url", and then using said variable to read data into my first working dataframe. I'll then use glimpse() from the dplyr package to examine the structure of the dataframe.
+
+```{r load-data}
+
+url <- "https://raw.githubusercontent.com/bkchanderban/CUNY_SPS/refs/heads/main/DATA607/DATA607/week_one_assignment/breast-cancer-wisconsin.csv"
+
+df1 <- read.csv(file = url, na.strings = "?")
+
+
+glimpse(df1)
+
+```
+
+With the na.strings = "?" being specified when the dataframe was being read in, all missing values within the dataframe were shifted from their prior encoding of "?" to that of NA (Not Available/Missing). The subsequent feature engineering step would thus be to remove the records with missing values. An LLM was consulted for this stage, and the records of the interaction may be found within my GitHub repo, in the same section where this assignment lies.
+
+```{r clean-missing-values}
+
+#removing null values and assigning the cleaned data frame to df1_clean
+
+df1_clean <- na.omit(df1)
+
+#assessing the number of removed records by subtracting the number of rows of the new dataframe from the initial one
+
+n_dropped <- nrow(df1) - nrow(df1_clean)
+
+#printing out the number of removed rows
+
+cat("Number of rows removed due to missing values:", n_dropped)
+
+```
+
+Now that we've obtained a dataframe cleaned of missing values, I will then continue the feature engineering process by recoding the variables within the "class" variable. In this, values of 2 will be coded as "benign", and values of 4 will be coded as "malignant", as per the dataset information from UCI Machine Learning Repository.
+
+```{r recode-class}
+
+# Modifying the class column, first converting class into a factor, and then recoding the values of 2 and 4 into "benign" and "malignant" respectively
+
+df1_clean <- df1_clean %>%
+  mutate(class = recode_factor(class, `2` = "benign", `4` = "malignant"))
+
+# Checking if recoding was successful
+head(df1_clean$class)
+
+```
+
+## Subsetting The Dataframe
+
+Now that we've recoded the cancer class variable, the next step entails subsetting the dataframe. In this, I would have consulted the LLM with respect to which of the available cancer variables in the data set are, with the lens of the cancer subject matter, most notable and viable for predicting the cancer class. I will first use the colnames() function to obtain the variable names within the dataset and then determine the top 6 predictive ones.
+
+```{r view-column-names}
+
+colnames(df1_clean)
+
+```
+
+Upon obtaining the six to be utilized, the dataset will then be subsetted.
+
+```{r subset-features}
+
+
+#Subset the data frame to include the six most predictive features plus the class
+df_model <- df1_clean %>%
+  select(uniformity_cell_size, uniformity_cell_shape, bare_nuclei,
+         clump_thickness, bland_chromatin, normal_nucleoli, class)
+
+# Display the first 10 rows of the subset using gt() for cleaner formatting
+df_model %>%
+  slice_head(n = 10) %>%
+  gt() %>%
+  tab_header(
+    title = "Sample of Cleaned and Subsetted Dataset"
+  )
+
+```
+
+## EDA: Correlation Matrix
+
+Upon completing the essential aim of this assignment (subsetting a larger dataframe into a more focused one), one piece of exploratory data analysis might entail the construction of a correlation matrix, so as to assess how the numeric features relate to one another. That is, how strongly related different pairs of the examined features are.
+
+```{r correlation-matrix}
+
+# Loading corrplot library to generate correlation matrix
+library(corrplot)
+
+cor_matrix <- cor(select(df_model, -class))
+corrplot(cor_matrix, method = "color", tl.cex = 0.8)
+
+```
+
+The plot reveals strong positive linear relationships between certain features, such as *uniformity of cell shape* and *cell size*, indicated by the dark blue squares. This suggests that these characteristics tend to vary together and may jointly contribute to accurate classification of tumor type.
+
+## Conclusion
+
+This analysis served to subset and transform the Breast Cancer Wisconsin dataset to focus on six features most predictive of tumor type. After cleaning and recoding the data, exploratory data analysis through a correlation matrix revealed some strong linear relationships among several variables, most pronounced between the uniformity of the cell shape and the uniformity of the cell size.
+
+Progressing, one might consider:
+
+-   Building a regression model with the purpose of classifying breast tumors
+
+-   Comparing the generated model performance using all features versus the six subsetted ones
+
+## LLM Used
+
+-   OpenAI. (2026). *ChatGPT (Version 4o)* \[Large language model\]. [https://chat.openai.com](https://chat.openai.com/) . Accessed January 30, 2026.
