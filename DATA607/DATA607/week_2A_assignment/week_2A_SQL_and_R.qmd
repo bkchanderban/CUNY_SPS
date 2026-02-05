@@ -1,0 +1,60 @@
+---
+title: "week_2A_SQL_and_R"
+author: "Brandon Chanderban"
+format: html
+editor: visual
+execute: 
+  echo: true
+---
+
+# Objective
+
+The principal objective of this week 2A assignment is to build a small movie rating dataset using PostgreSQL (within pgAdmin 4, where the data will be housed) and then connect the resulting database tables to Rstudio for analysis.
+
+## Data Collection Plan
+
+-   Six movies, recently released and relatively popular, will be selected (potentially using a platform like IMBD, which hosts user-generated ratings).
+
+-   Five participants will then be consulted to garner their ratings of each of the selected movies (on a 1-5 review scale).
+
+The collection of this data may be facilitated via a Google sheets form, with the link being shared in a group chat so participants can easily submit their responses.
+
+## Movie-Rating Database Design
+
+In the confines of pgAdmin 4, three relational tables will be concocted.
+
+-   a table of 'users' (user_id SERIAL PRIMARY KEY, name TEXT)
+
+-   a table of 'movies' (movie_id SERIAL PRIMARY KEY, title TEXT)
+
+-   and a table of the actual 'ratings' (user_id INT REFERENCES users(user_id), movie_id INT REFERENCES movies(movie_id), rating INT CHECK (rating BETWEEN 0 and 5), PRIMARY KEY (user_id, movie_id))
+
+### Notes:
+
+The 'ratings' table will serve as the mechanism through which the many-to-many relationship between the 'users' and 'movies' tables are modeled. The composite primary key will serve to ensure that each user can rate each movie only once. For movies a reviewer has not seen, missing ratings will be recorded as 0 (as permitted by the CHECK constraint) and later converted to NA in R.
+
+The tables themselves will be generated via 'CREATE TABLE' statements in pgAdmin 4, and their data will be inserted manually via 'INSERT INTO' commands. Once created and populated, 'JOIN' queries will be used to combine data across the three data tables for export and analysis.
+
+# R Analysis Plan
+
+The 'RPostgres' and 'DBI' packages will be used to connect to the PostgreSQL database. The ratings data will then be loaded into Rstudio as a data frame.
+
+Using the 'dplyr' package, the following exploratory analyses will be conducted:
+
+-   Calculating the average rating per movie
+
+-   Counting the number of ratings submitted by each reviewer
+
+-   Counting the number of ratings received per movie
+
+-   Handling missing data (replacing 0s with NA)
+
+# Optional Endeavors
+
+-   Visualizing rating distributions with the 'ggplot2' library
+
+-   Normalizing ratings by user to adjust for individual rating biases
+
+## 
+
+## 
