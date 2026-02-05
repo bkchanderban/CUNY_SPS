@@ -1,0 +1,34 @@
+---
+title: "week_2B_classification_metrics"
+author: "Brandon Chanderban"
+format: html
+editor: visual
+execute: 
+  echo: true
+---
+
+# Objective
+
+This assignment centers on evaluating the performance of a binary classification model and garnering an understanding of how different probability thresholds affect classification outcomes and performance metrics.
+
+More specifically, this analysis will endeavor to examine how model predictions, derived metrics, and confusion matrices change as the decision threshold is adjusted.
+
+The data to be used within the scope of this analysis is that of the [penguin_predictions.csv](https://raw.githubusercontent.com/acatlin/data/refs/heads/master/penguin_predictions.csv) which contains model-generated predictions and true class labels:
+
+-   .pred.female: Predicted probability that the observation belongs to the class of "female"
+
+-   .pred.class: Predicted class using a default threshold of 0.5
+
+-   sex: The actual class label used during the training of the model
+
+# Initial Plan
+
+-   Using the dataset as described prior, the null error rate will be calculated by identifying the majority class and its corresponding error rate.
+
+-   The actual class distribution will then be visualized by way of 'ggplot2'.
+
+-   The predicted classes will then be manually recomputed using the three prescribed thresholds: 0.2, 0.5, and 0.8.
+
+-   At each of these thresholds, both the confusion matrix components (TP, FP, TN, FN) and the performance metrics (accuracy, precision, recall, and F1 score) will have to be calculated.
+
+-   The results will then be summarized in a table and examples of real-world scenarios will be discussed, wherein a low or high threshold might be more appropriate.
