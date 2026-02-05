@@ -55,6 +55,4 @@ Using the 'dplyr' package, the following exploratory analyses will be conducted:
 
 -   Normalizing ratings by user to adjust for individual rating biases
 
-## 
 
-## 
