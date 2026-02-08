@@ -7,7 +7,7 @@ execute:
   echo: true
 ---
 
-# Objective
+# Introduction
 
 This assignment centers on evaluating the performance of a binary classification model and garnering an understanding of how different probability thresholds affect classification outcomes and performance metrics.
 
@@ -17,7 +17,7 @@ The data to be used within the scope of this analysis is that of the [penguin_pr
 
 -   .pred.female: Predicted probability that the observation belongs to the class of "female"
 
--   .pred.class: Predicted class using a default threshold of 0.5
+-   .pred.class: Predicted class label (1 = female, 0 = male), based on '.pred_female \> 0.5'
 
 -   sex: The actual class label used during the training of the model
 
@@ -32,3 +32,221 @@ The data to be used within the scope of this analysis is that of the [penguin_pr
 -   At each of these thresholds, both the confusion matrix components (TP, FP, TN, FN) and the performance metrics (accuracy, precision, recall, and F1 score) will have to be calculated.
 
 -   The results will then be summarized in a table and examples of real-world scenarios will be discussed, wherein a low or high threshold might be more appropriate.
+
+# Code Base (Body)
+
+## Data Import and Set Up
+
+The necessary libraries to facilitate the analysis will be loaded, and the dataset will be imported int an R data frame.
+
+```{r library-setup}
+
+library(tidyverse)
+
+```
+
+```{r load-data-frame}
+
+url <- "https://raw.githubusercontent.com/acatlin/data/refs/heads/master/penguin_predictions.csv"
+
+df <- read.csv(file = url)
+
+head(df, 10)
+```
+
+## Exploring Class Balance
+
+As recommended in the practical step-by-step guidance for this assignment, the class balance of the actual class labels (utilized during model training) will be examined.
+
+```{r class-balance}
+
+df %>% count(sex) %>% arrange(desc(sex))
+
+```
+
+As viewed in the above data table, the dataset used to train the model contained more penguin male instances than female. This class imbalance can also be visualized in the bar graph below:
+
+```{r actual-class-distribution}
+
+library(ggplot2)
+
+ggplot(df, aes(x = sex, fill = sex)) +
+  geom_bar() +
+  geom_text(stat = "count", aes(label = after_stat(count)), vjust = -0.5) +
+  scale_fill_manual(values = c("male" = "steelblue", "female" = "salmon")) +
+  labs(
+    title = "Distribution of Actual Class Labels (Sex)",
+    x = "Sex",
+    y = "Count"
+  ) +
+  theme_minimal()
+
+```
+
+## Calculating the Null Rate Error
+
+Now that we've examined the class distribution of the actual observations, the next step entails calculating the null error rate (also known as the majority-class error rate). This essentially serves to determine the proportion of errors that would result from always predicting the most frequent class.
+
+```{r null-rate-error}
+
+#Count of each class
+class_counts <- df %>% count(sex)
+
+#Total number of observations
+total_obs <- nrow(df)
+
+#Count of majority class
+majority_class_n <- max(class_counts$n)
+
+#Null error rate is eqaul to the proportion of incorrect predictions if the model always predicted the majority class (male)
+
+null_error_rate <- 1 - (majority_class_n / total_obs)
+
+#Display result
+cat("Null Error Rate:", round(null_error_rate, 3))
+```
+
+## Why is the Null Error Rate Important?
+
+Understanding the null error rate is important since it acts as a baseline metric for classification performance. In this, it tells us how well a model performs compared to a trivial strategy wherein the most common class is always guessed.
+
+So, we can surmise that if a model does not outperform the null error rate, then it is essentially no better than guessing based on the majority class. Furthermore, a **higher null error rate** (with reflects a more balanced class distribution) indicates that the classification task is more challenging, and even simple models must work harder to make accurate predictions.
+
+Conversely, a **low null error rate** (in which one class dominates the data) can be misleading. In this, a model may appear "highly accurate" simply by predicting the majority class every time. However, this may be problematic in practice, especially in domains where correctly identifying the minority class is critical, such as detecting the presence of a disease.
+
+## Confusion Matrices At Multiple Thresholds
+
+```{r preparing-predicted-classes-per-threshold}
+
+# Recode actual class as binary (1 = female, 0 = male)
+df <- df %>%
+  mutate(actual = ifelse(sex == "female", 1, 0))
+
+# Apply different thresholds
+df <- df %>%
+  mutate(
+    pred_02 = ifelse(.pred_female > 0.2, 1, 0),
+    pred_05 = ifelse(.pred_female > 0.5, 1, 0),
+    pred_08 = ifelse(.pred_female > 0.8, 1, 0)
+  )
+
+head(df,5)
+```
+
+In the chunk of code above, the first mutate() function served the purpose of creating a new column (actual) in the df dataframe, which is binary version of the sex variable. Specifically, if the penguin sex is female, then the value within the actual column is 1, and otherwise (the sex is male), the value shall be 0.
+
+The second mutate() instance served to create three new columns within the dataframe (pred_02, pred_05, and pred_08), each representing model predictions under a different threshold. For example, in the pred_02 column, if a value within the .pred_female column exceeds 0.2, it is classified as 1 (female); otherwise, it is 0 (male).
+
+This step enables us to compare how different thresholds influence the model's prediction.
+
+Next, we compute the confusion matrix counts for each threshold.
+
+```{r computing-confusion-matrix}
+
+# Helper function to calculate TP, FP, TN, FN
+get_confusion_counts <- function(predicted, actual) {
+  tibble(
+    TP = sum(predicted == 1 & actual == 1),
+    FP = sum(predicted == 1 & actual == 0),
+    TN = sum(predicted == 0 & actual == 0),
+    FN = sum(predicted == 0 & actual == 1)
+  )
+}
+
+# Compute for each threshold
+cm_02 <- get_confusion_counts(df$pred_02, df$actual)
+cm_05 <- get_confusion_counts(df$pred_05, df$actual)
+cm_08 <- get_confusion_counts(df$pred_08, df$actual)
+
+# Display all together
+conf_matrices <- bind_rows(
+  `Threshold: 0.2` = cm_02,
+  `Threshold: 0.5` = cm_05,
+  `Threshold: 0.8` = cm_08,
+  .id = "Threshold"
+)
+
+conf_matrices
+
+```
+
+In order to derive the confusion counts at each of the utilized thresholds, a helper function called get_confusion_counts() was created. This function accepts both the predicted and the actual class vectors and returns a tibble containing the four components of a confusion matrix.
+
+-   **TP: True Positives**, where the model predicted 1 and the actual class is 1
+
+-   **FP: False Positives**, where the model predicted 1 and the actual class is 0
+
+-   **TN: True Negatives**, where the model predicted 0 and the actual class is 0
+
+-   **FN: False Negatives**, where the model predicted 0 and the actual class is 1
+
+We applied the created function to each prediction column (pred_02, pred_05, and pred_08), resulting in three confusion matrices: cm_02, cm_05, and cm_08.
+
+Finally, all of the matrices were combined using bind_rows(), with the .id argument adding a new "Threshold" column to indicate which threshold each row corresponds to.
+
+## Performance Metrics
+
+```{r performance-metrics}
+
+library(knitr)
+library(kableExtra)
+
+# Compute metrics (already done above)
+metrics <- conf_matrices %>%
+  mutate(
+    Accuracy = (TP + TN) / (TP + FP + TN + FN),
+    Precision = TP / (TP + FP),
+    Recall = TP / (TP + FN),
+    F1 = 2 * (Precision * Recall) / (Precision + Recall)
+  ) %>%
+  select(Threshold, TP, FP, TN, FN, Accuracy, Precision, Recall, F1)
+
+# Pretty kable table
+kable(metrics, digits = 3, caption = "Performance Metrics at Different Thresholds") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"),
+                full_width = FALSE,
+                position = "center") %>%
+  row_spec(0, bold = TRUE, background = "#f5f5f5")  # header style 3, caption = "Performance Metrics at Different Thresholds")
+
+
+```
+
+In the above block of R code, the four performance metrics were calculated for each threshold. They are as follows:
+
+-   Accuracy: Overall correctness
+
+-   Precision: Proportion of predicted positives that are actually positive
+
+-   Recall: Proportion of actual positives that are correctly predicted
+
+-   F1 Score: Harmonic mean of precision and recall
+
+## Threshold Use Cases
+
+Now that we've calculated the performance metrics at each of the three thresholds, we can interpret the results and suggest real world contexts in which each threshold might be preferable.
+
+### Threshold 0.2
+
+At this relatively lenient threshold, there was a True Positive figure of 37 (the highest of all three thresholds), which in turn means that most females were predicted correctly here. However, it also had the largest number of False Positives (6) which in turn means that quite a few males were erroneously predicted as being female. Therefore, the precision metric at this value was the lowest calculated (approximately 0.860) due to the incorrectly predicted female classes. However, since nearly all of the true females were caught by this threshold, it possesses the highest recall figure of the three (0.949).
+
+Thus, it can be said that model prioritizes recall, since it caught nearly all of the females (the positive class), but at the cost of possessing more false positive errors. As such, this threshold could be preferable in real world cases wherein missing positives is quite costly. For example, in the case of medical screenings for disease and viruses, where catching every potential case is more important than a false alarm.
+
+### Threshold 0.5
+
+At the standard threshold of 0.5, the model demonstrates a more balanced classification performance. At this threshold, the model produced 36 True Positives, indicating that the majority of female penguins were correctly identified, while the number of False Positives decreased to 3. This reduction in false positives suggests that fewer male penguins were incorrectly classified as female compared to the more lenient threshold.
+
+This threshold provides a balanced trade-off between sensitivity (recall) and specificity (precision), making it a strong general purpose choice. As such, it may be more ideal for everyday classification tasks where both false positives and false negatives carry equal weight, such as in email spam filtering.
+
+### Threshold 0.8
+
+At the most stringent threshold of 0.8, the model became stricter in assigning positive classifications (the female class). While the number of True Positives remained stable at 36, the number of False Positives was reduced further to just 2, the lowest among all three thresholds. This indicates that very few male penguins were incorrectly classified as female under this criterion.
+
+As a result, the precision metric reaches its highest value (0.947), signifying that predictions of the female class are highly reliable at this threshold. However, this improvement in precision comes at the expense of recall, which remains at 0.923, reflecting that some true female instances are still not identified due to the stricter cutoff.
+
+This threshold is particularly well‑suited to real‑world applications wherein false positives are especially costly or undesirable. Examples include fraud detection, where a false alarm may cause significant cost and inconvenience.
+
+# Conclusion
+
+This analysis served to demonstrate how adjusting the classification thresholds ultimately impacts model performance. In this it was found that lower thresholds improved recall but also increased false positives, whilst higher thresholds enhanced precision at the cost of recall. The standard threshold of 0.5 in turn, offered a balanced trade-off between the two.
+
+Understanding these trade-offs is essential when aligning model behavior with real-world priorities, such as favoring recall in medical diagnoses or precision in fraud detection. Ultimately, the "best" threshold depends on the specific costs of errors in the given contextual situation.
