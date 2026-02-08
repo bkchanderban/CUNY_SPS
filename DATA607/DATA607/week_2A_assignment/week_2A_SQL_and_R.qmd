@@ -7,7 +7,7 @@ execute:
   echo: true
 ---
 
-# Objective
+# Introduction
 
 The principal objective of this week 2A assignment is to build a small movie rating dataset using PostgreSQL (within pgAdmin 4, where the data will be housed) and then connect the resulting database tables to Rstudio for analysis.
 
@@ -55,4 +55,265 @@ Using the 'dplyr' package, the following exploratory analyses will be conducted:
 
 -   Normalizing ratings by user to adjust for individual rating biases
 
+# Code Base (Body)
 
+To begin, the necessary packages for connecting the PostgreSQL database (via pgAdmin 4) to RStudio were installed:
+
+```{r install-packages}
+
+install.packages('DBI')
+install.packages('RPostgres')
+
+```
+
+Subsequently, the connection to the database was established using the dbConnect() function.
+
+```{r connect-databse}
+
+library(dplyr)
+library(DBI)
+library(RPostgres)
+
+# Connect to PostgreSQL
+con <- dbConnect(
+  RPostgres::Postgres(),
+  dbname = "movie_ratings",     # Name of the created database
+  host = "localhost",           # Assuming PostgreSQL is running locally
+  port = 5432,                  # Default PostgreSQL port
+  user = "postgres",            
+  password = Sys.getenv("DB_PASSWORD")     
+)
+
+```
+
+The connection was tested by listing the available tables within the database.
+
+```{r connection-test}
+
+dbListTables(con)
+
+```
+
+The next step entailed importing the relevant tables into R as data frames using SQL queries via dbGetQuery()
+
+```{r importing-data-tables}
+
+# Load users table
+users <- dbGetQuery(con, "SELECT * FROM users")
+
+# Load movies table
+movies <- dbGetQuery(con, "SELECT * FROM movies")
+
+# Load ratings table
+ratings <- dbGetQuery(con, "SELECT * FROM ratings")
+
+```
+
+Finally, the three tables were joined to provide full context for the ratings, incorporating both user and movie information.
+
+```{r joining-tables}
+
+ratings_full <- ratings %>%
+  left_join(users, by = c("user_id" = "user_id")) %>%
+  left_join(movies, by = c("movie_id" = "movie_id"))
+
+head(ratings_full, 7)
+```
+
+Now that the data is properly housed within an R data frame (ratings_full), the next step is to address instances of missing data in the 'rating' column. In this dataset, a value of 0 represents cases where a reviewer had not seen a particular movie. To handle this appropriately, these values are recoded as NA. This treatment preserves the integrity of the dataset while enabling more flexible analytical approaches in the future (for example, if a recommender system were to be constructed using this dataset).
+
+```{r convert-missing-values}
+
+ratings_full <- ratings_full %>%
+  mutate(rating = na_if(rating, 0))
+
+head(ratings_full)
+
+```
+
+# Exploratory Data Analysis
+
+In this section, the first analytical task undertaken pertains to the calculation of the average rating for each movie.
+
+```{r average-rating-per-movie}
+
+ratings_full %>%
+  group_by(title) %>%
+  summarise(
+    avg_rating = mean(rating, na.rm = TRUE),
+    num_ratings = sum(!is.na(rating))
+  ) %>%
+  arrange(desc(avg_rating))
+
+```
+
+After computing the mean ratings by movie title, the results were ordered in descending order based on the average rating. From this summary, it is observed that *Predator: Badlands* received the highest average rating among reviewers, while *Now You See Me: Now You Don't* received the lowest.
+
+When examining the number of ratings per movie, all five reviewers reported having seen both *Avatar: Fire and Ash* and *People We Meet On Vacation. Fire and Ash* proved to be a major theatrical release, topping the U.S. and Canadian box offices during its opening weekend, as reported by this [BBC news article.](https://www.bbc.com/news/articles/cly5jrrj227o) In contrast, *People We Meet On Vacation* was released via Netflix rather than through a traditional theatrical distribution, which may have contributed to its similarly high viewership among participants.
+
+```{r ratings-per-user}
+
+ratings_full %>%
+  group_by(name) %>%
+  summarise(total_rated = sum(!is.na(rating))) %>%
+  arrange(desc(total_rated))
+
+```
+
+The number of ratings submitted by each participant was also examined. From this summary, it is observed that Krystol provided the greatest number of movie ratings, while Sunil provided the fewest. However, given the small sample size of movies (six titles), these differences may not be fully indicative of each participant's broader movie-viewing habits. With a larger and more diverse set of items, these patterns could be assessed more reliably.
+
+# Optional Endeavor: Visualization
+
+In this optional extension, a bar chart was created to visualize average movie ratings while simultaneously displaying the number of ratings received per movie. In this visualization, bar height represents the average rating, and the number of submitted ratings is displayed as a label at the end of each bar.
+
+```{r ratings_visualization}
+
+library(ggplot2)
+
+# Summarize the data
+ratings_summary <- ratings_full %>%
+  group_by(title) %>%
+  summarise(
+    avg_rating = mean(rating, na.rm = TRUE),
+    num_ratings = sum(!is.na(rating))
+  ) %>%
+  arrange(desc(avg_rating))
+
+# Plot with number of ratings as text labels
+ggplot(ratings_summary, aes(x = reorder(title, avg_rating), y = avg_rating)) +
+  geom_col(fill = "steelblue") +
+  geom_text(aes(label = num_ratings), hjust = -0.1, size = 3.5) +  
+  coord_flip() +
+  labs(
+    title = "Average Movie Ratings",
+    subtitle = "Labeled with Number of Ratings per Movie",
+    x = "Movie Title",
+    y = "Average Rating"
+  ) +
+  ylim(0, 5.5) +  # Extend y-axis to give space for text labels
+  theme_minimal()
+
+```
+
+The above visualization provides an intuitive comparison across movies, allowing both rating magnitude and participation levels to be assessed simultaneously.
+
+# Conclusion
+
+This assignment served to demonstrate a small-scale, end-to-end workflow for collecting, storing, and analyzing user-item data using PostgreSQL and R. Key findings include meaningful variation in movie ratings, differences in user participation, and the presence of missing data due to unreviewed movie titles, an issue commonly encountered in real-world survey and recommendation settings.
+
+From a methodological standpoint, the use of a normalized relational schema and the recoding of missing ratings as NA provide a solid foundation for further analysis. The results suggest that while average ratings offer useful insight, they should be interpreted alongside the number of ratings received to avoid overemphasizing movies with fewer reviews.
+
+Several avenues exist to extend and strengthen the scope of this work. Future iterations could expand the number of users and movies to improve generalizability, incorporate additional metadata (such as genre, release year, or production company), or apply user-level rating normalization to account for individual rating tendencies. Additionally, this dataset could serve as a starting point for building a simple recommender system.
+
+# Appendix
+
+## A: SQL Code Used To Create And Populate Tables
+
+```{sql}
+
+--Create the users table
+CREATE TABLE users (
+    user_id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL
+);
+
+--Create the movies table
+CREATE TABLE movies (
+    movie_id SERIAL PRIMARY KEY,
+    title TEXT NOT NULL
+);
+
+--Create the ratings table
+CREATE TABLE ratings (
+    user_id INT NOT NULL,
+    movie_id INT NOT NULL,
+    rating INT CHECK (rating BETWEEN 0 AND 5),
+
+    PRIMARY KEY (user_id, movie_id),
+
+    CONSTRAINT fk_user
+        FOREIGN KEY (user_id)
+        REFERENCES users (user_id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_movie
+        FOREIGN KEY (movie_id)
+        REFERENCES movies (movie_id)
+        ON DELETE CASCADE
+);
+
+--Insert users
+INSERT INTO users (name) VALUES
+  ('Brianna'),
+  ('Krystol'),
+  ('Nalini'),
+  ('Sunil'),
+  ('Destiny');
+
+--Insert movies
+INSERT INTO movies (title) VALUES
+  ('Zootopia 2'),
+  ('Avatar: Fire and Ash'),
+  ('People We Meet On Vacation'),
+  ('Predator: Badlands'),
+  ('Tron: Ares'),
+  ('Now You See Me: Now You Don''t');
+
+-- Insert Brianna's ratings (user_id = 1)
+INSERT INTO ratings (user_id, movie_id, rating) VALUES
+  (1, 1, 3),
+  (1, 2, 5),
+  (1, 3, 5),
+  (1, 4, 4),
+  (1, 5, 0),
+  (1, 6, 3);
+
+-- Insert Krystol's ratings (user_id = 2)
+INSERT INTO ratings (user_id, movie_id, rating) VALUES
+  (2, 1, 4),
+  (2, 2, 4),
+  (2, 3, 1),
+  (2, 4, 4),
+  (2, 5, 3),
+  (2, 6, 1);
+
+-- Inserting Nalini's ratiings (user_id = 3)
+INSERT INTO ratings (user_id, movie_id, rating) VALUES
+  (3, 1, 3),
+  (3, 2, 5),
+  (3, 3, 5),
+  (3, 4, 5),
+  (3, 5, 4),
+  (3, 6, 0);
+
+-- Insert Sunil's ratings (user_id = 4)
+INSERT INTO ratings (user_id, movie_id, rating) VALUES
+  (4, 1, 0),
+  (4, 2, 2),
+  (4, 3, 4),
+  (4, 4, 0),
+  (4, 5, 4),
+  (4, 6, 5);
+
+-- Insert Destiny's ratings (user_id = 5)
+INSERT INTO ratings (user_id, movie_id, rating) VALUES
+  (5, 1, 4),
+  (5, 2, 3),
+  (5, 3, 2),
+  (5, 4, 4),
+  (5, 5, 0),
+  (5, 6, 2);
+
+```
+
+## B: Closing The Connection
+
+```{r close-database-connection}
+
+# Close the PostgreSQL database connection
+dbDisconnect(con)
+```
+
+## LLM Used
+
+-   OpenAI. (2026). *ChatGPT (Version 4o)* \[Large language model\]. [https://chat.openai.com](https://chat.openai.com/) . Accessed February 07, 2026.
