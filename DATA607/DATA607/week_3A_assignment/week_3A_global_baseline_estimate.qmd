@@ -1,0 +1,58 @@
+---
+title: "week_3A_global_baseline_estimate"
+author: "Brandon Chanderban"
+format: html
+editor: visual
+execute: 
+  echo: true
+---
+
+# Introduction/Approach
+
+The goal of this week 3A assignment is to implement a Global Baseline Estimate recommender system in RStudio. The data to be used for this task will come from the professor-provided Movie Ratings Excel file. I selected this option because it contains a larger number of respondents (more than the five in my own dataset), which should provide more observations for testing the recommender system's output.
+
+In examining the types of recommender systems, and compared to more personalized recommender systems (such as collaborative filtering), the Global Baseline approach facilitates predictions via three components:
+
+-   an overall average rating (the global mean),
+
+-   a movie specific bias term, and
+
+-   a user-specific bias term.
+
+Subsequently, the prediction formula for a specific user's rating of a particular movie will be that of:
+
+predicted rating = μ + bᵢ + bᵤ
+
+Where the predicted rating is equal to the global mean (μ), plus the movie bias (bᵢ) and the user bias (bᵤ).
+
+## Data Preparation
+
+As mentioned prior, the dataset will be taken from the Movie Ratings Excel file provided by Professor Catlin. This data is currently within a wide format, where rows represent individual users and columns represent movies. The cells contain the ratings, and some blanks represent movies that were not viewed (or at least not rated).
+
+Therefore, in my data preparation workflow, after importing the Excel file into R (using the readxl functionality), the dataset will be reshaped into a long format (likely using pivot_longer()), and missing entries will be handled as NA values. This is important to ensure that only observed ratings are used when computing the averages and bias terms.
+
+The resulting dataframe will include the variables user, movie, and rating, similar to how my own dataset was structured in the previous Week 2A assignment.
+
+## Computing the Global Baseline Components
+
+The next stage will involve calculating:
+
+1.  **The global mean (μ)**: the average across all observed movie ratings.
+
+2.  **The movie bias** **(bᵢ)**: for each movie, determine its average rating and subtract the global mean from this figure to discern whether it tends to be rated above or below average.
+
+3.  **The user bias (bᵤ)**: For each user, determine their average rating and subtract the global mean from this figure to discern whether the user tends to rate more stringently or generously than average.
+
+Once these values are computed for all users and movies, it becomes possible to estimate ratings for movies that a reviewer has not rated. Recommendations can then be made by ranking unseen movies by their predicted ratings and selecting the highest.
+
+## Anticipated Challenges/Data Issues
+
+-   Ensuring missing ratings are properly handled and excluded from mean/bias calculations.
+
+-   Confirming that the RStudio implementations produces results that align with the spreadsheet logic and algorithm.
+
+-   Verifying the garnered predictions against one or more examples executed within the confines of the spreadsheet.
+
+## Optional Endeavor
+
+Once the Global Baseline Estimate recommender system in established, a small function may be developed that takes arguments for a specific user and a specific movie. The function would then use the ratings dataframe and the precomputed baseline components to output the predicted rating for that user-movie pair.
