@@ -1,0 +1,56 @@
+---
+title: "week_3B_window_functions"
+author: "Brandon Chanderban"
+format: html
+editor: visual
+execute: 
+  echo: true
+---
+
+# Introduction/Approach
+
+The objective of this week 3B assignment is to apply window functions to time series data so as to compute both rolling and cumulative summary statistics. More specifically, this task requires the calculation of:
+
+-   The year-to-date (YTD ) average, and
+
+-   The six-day moving average
+
+for two or more separate time-series items.
+
+For this assignment, I plan to use end-of-day Bitcoin and Ethereum prices (beginning January 1st, 2022 to present) in order to showcase grouped window functionality across multiple instruments.
+
+All calculations will be executed within R using the dplyr package, utilizing grouped window operations here rather than via SQL.
+
+## Data Source
+
+The dataset to be analyzed will likely consist of three principal components:
+
+1.  The date variable,
+
+2.  The instrument (in this case, BTC and ETH), and
+
+3.  The variable of closing price.
+
+The data may be obtained from a public finance API (such as Yahoo Finance, or some other cryptocurrency data provider) and then imported within RStudio as a dataframe.
+
+In order to properly calculate the desired summary statistics, the data must be sorted in chronological order, contain no missing values (or, if present, be handled accordingly), and include more than one instrument so as to demonstrate and make use of grouped window calculations.
+
+## Anticipated Challenges
+
+-   Ensuring that the data is in fact arranged within chronological order before applying calculations for the rolling averages.
+
+-   Making sure that the YTD average resets at the start of each new calendar year within the dataset.
+
+-   Ensuring that the grouped window functions operate independently across the different examined instruments (BTC and ETH).
+
+## Optional Endeavor
+
+In this assignment, I may generate plots to visually depict:
+
+-   The closing prices (per instrument) over the examined time period,
+
+-   The YTD average, and/or
+
+-   The six-day moving average on a time-series graph.
+
+Such visualizations as above would serve to reinforce the interpretations garnered from the window calculations.
