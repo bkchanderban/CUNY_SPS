@@ -56,3 +56,303 @@ Once these values are computed for all users and movies, it becomes possible to 
 ## Optional Endeavor
 
 Once the Global Baseline Estimate recommender system in established, a small function may be developed that takes arguments for a specific user and a specific movie. The function would then use the ratings dataframe and the precomputed baseline components to output the predicted rating for that user-movie pair.
+
+# Code Base (Body)
+
+The first step, as with most analytical tasks in RStudio, will call for the loading of the required libraries.
+
+```{r load-libraries}
+
+library(readxl)
+library(tidyverse)
+
+```
+
+Subsequently, we must import the data into our working environment. In this case, the dataset to be examined originates from the critic movie ratings provided by Professor Catlin.
+
+```{r import-data}
+
+url <- "https://raw.githubusercontent.com/bkchanderban/CUNY_SPS/refs/heads/main/DATA607/DATA607/week_3A_assignment/MovieRatings.csv"
+
+raw_ratings <- read.csv(url,stringsAsFactors = FALSE)
+
+glimpse(raw_ratings)
+```
+
+Note that the data remains in its initial wide formatting. While this type of orientation allows for more intuitive perception from a human standpoint, restructuring it into a long format allows for more complex analytical undertakings.
+
+Specifically, at present, the data is structured such that:
+
+-   The rows contain the critics/users
+
+-   The columns harbor the individual movie titles
+
+-   The cells at the intersection of the two contain the actual ratings (with blanks/NAs representing unrated instances)
+
+For purposes of modeling and calculation, the data must instead be arranged in the following structure: **users \| movie \| rating**
+
+```{r convert-to-long-format}
+
+long_ratings <- raw_ratings %>%
+  pivot_longer(
+    cols = -Critic,        #Keeping the Critic column fixed
+    names_to = "movie",    #New column for the movie titles 
+    values_to = "rating"   #New column for the ratings
+  ) %>%
+  rename(user = Critic)    #Renaming the Critic column to user
+
+head(long_ratings, 7)
+
+```
+
+Now that we have reoriented the data table in a long formatting, the next step is to ensure that the extracted ratings are indeed numeric in nature.
+
+```{r ensure-blanks-and-numeric}
+
+long_ratings <- long_ratings %>%
+  mutate(rating = as.numeric(rating))
+
+```
+
+## Computing Global Baseline Components
+
+Next, we will begin the calculations required for the establishment of the Global Baseline Estimate recommender system. The first of these is the previously mentioned **Global Mean (μ)**. This mean will be computed using only the observed ratings (i.e., non-NA-values).
+
+```{r compute-global-mean}
+
+mu <- long_ratings %>%
+  summarise (global_mean = mean(rating, na.rm = TRUE)) %>%
+  pull(global_mean)
+
+mu
+```
+
+Now that we have discerned the value of the Global Mean, the next stage in the analytical process is to compute the **movie bias** **(bᵢ)**.
+
+```{r compute-movie-bias}
+
+movie_bias <- long_ratings %>%
+  group_by(movie) %>%
+  summarise(
+    movie_avg = mean(rating, na.rm = TRUE),
+    b_i = movie_avg - mu
+  )
+
+movie_bias
+```
+
+The movie bias reflects whether a particular film tends to be rated above or below the overall average rating across all movies.
+
+Now, possessing the movie bias values, the final component to compute is that of the **user bias (bᵤ)**.
+
+```{r compute-user-bias}
+
+user_bias <- long_ratings %>%
+  group_by(user) %>%
+  summarise(
+    user_avg = mean(rating, na.rm = TRUE),
+    b_u = user_avg - mu
+  )
+
+user_bias
+
+```
+
+The user bias captures whether a given critic tends to rate more generously or more stringently relative to the global mean.
+
+## Making A Prediction
+
+Now that we have attained all the necessary components for a Global Baseline Estimate recommender system, let us proceed with generating a prediction. Once the prediction is computed within R, we can compare the estimated rating to the corresponding output produced using the spreadsheet algorithm.
+
+Specifically, we will consider the following question:
+
+**Which of Matt's unseen movies (either Deadpool or JungleBook) would he be more inclined to view?**
+
+We begin by computing Matt's estimated rating for *Deadpool*.
+
+```{r compute-deadpool-rating}
+
+prediction <- tibble(
+  user = "Matt",
+  movie = "Deadpool"
+) %>%
+  left_join(user_bias,by = "user") %>%
+  left_join(movie_bias,by = "movie") %>%
+  mutate(predicted_rating = round(mu + b_u + b_i,2))
+
+cat("Matt's predicted rating for Deadpool is:", prediction$predicted_rating)
+```
+
+Next, we compute his estimated rating for *JungleBook*.
+
+```{r compute-junglebook-rating}
+
+prediction <- tibble(
+  user = "Matt",
+  movie = "JungleBook"
+) %>%
+  left_join(user_bias, by = "user") %>%
+  left_join(movie_bias, by = "movie") %>%
+  mutate(predicted_rating = round(mu + b_u +b_i,2))
+
+
+cat("Matt's predicted rating for JungleBook is:", prediction$predicted_rating)
+```
+
+Therefore, since Matt's estimated rating for *Deadpool* (3.76) exceeds his predicted rating for *JungleBook* (3.22), the recommendation would be that, of the two, Matt should watch *Deadpool*.
+
+Moreover, the predictions obtained from the R calculations align precisely with the spreadsheet-based implementation of the Global Baseline algorithm, confirming the correctness of the approach.
+
+![](images/clipboard-1531213275.png)
+
+## Predicting All of the Missing Ratings
+
+Now that we have verified that the Global Baseline calculations are behaving as expected, we can generate predictions for all missing user-movie ratings.
+
+```{r compute-missing-ratings}
+
+#Calculate the predicted ratings for all user-movie pairings
+all_predictions <- long_ratings %>%
+  left_join(user_bias, by = "user") %>%
+  left_join(movie_bias, by = "movie") %>%
+  mutate(predicted_rating = round(mu + b_u +b_i,2))
+
+#Filter out to present predictions for only those instances of unrated movies
+recommendations <- all_predictions %>%
+  filter(is.na(rating)) %>%
+  arrange(user, desc(predicted_rating))
+
+recommendations
+```
+
+The resulting table above sets out the predicted ratings for all missing user-movie pairs. Additionally, it is also ordered by predicted rating (descending) for each user, so it becomes easy to see which unseen movies are most recommended for each individual.
+
+# Optional Endeavor: Creating a Predictor Function
+
+Instead of perusing a fairly decent-sized table, a user of the recommender system may prefer the ability to query a specific user-movie pairing and receive an estimated rating directly.
+
+To address that, a reusable function may be created.
+
+```{r create-predictor-function}
+
+predict_rating_1 <- function(desired_user, desired_movie){
+  
+  user_b <- user_bias %>% 
+    filter(user == desired_user) %>%
+    pull(b_u)
+  
+  
+  movie_b <- movie_bias %>% 
+    filter(movie == desired_movie) %>%
+    pull(b_i)
+   
+  if(length(user_b) == 0 | length(movie_b) == 0){
+    return("User or movie not found.")
+  }
+  
+
+  round(mu + user_b + movie_b, 2)
+  
+}
+
+```
+
+Testing the created function, using the same example of Matt and and his two unrated movies.
+
+```{r test-predictor-function-one}
+
+cat("Matt's predicted rating for Deadpool is:", predict_rating_1("Matt","Deadpool"))
+
+cat("\nMatt's predicted rating for JungleBook is:", predict_rating_1("Matt","JungleBook"))
+```
+
+Now, we can also simulate a case where the user or movie name is incorrect.
+
+```{r test-predictor-function-one}
+
+predict_rating_1("Mat","Joonglebook")
+```
+
+At this point, the function operates as desired. However, one thing still remains. If a movie has already been rated by a user, the function should return the actual observed rating, rather than the baseline prediction. So, the function will be adjusted accordingly.
+
+```{r edit-predictor-rating}
+
+predict_rating_2 <- function(desired_user, desired_movie){
+
+  # Step 1: Check if rating already exists
+ existing_rating <- long_ratings %>%
+  filter(user == desired_user,
+         movie == desired_movie,
+         !is.na(rating)) %>%
+  pull(rating)
+
+  # If user already rated movie
+  if(length(existing_rating) > 0){
+    return(paste0(
+      desired_user, 
+      " has viewed this movie before. A rating of ",
+      existing_rating,
+      " was given."
+    ))
+  }
+
+  # Step 2: Otherwise compute baseline prediction
+  user_b <- user_bias %>% 
+    filter(user == desired_user) %>% 
+    pull(b_u)
+
+  movie_b <- movie_bias %>% 
+    filter(movie == desired_movie) %>% 
+    pull(b_i)
+  
+  if(length(user_b) == 0 | length(movie_b) == 0){
+    return("User or movie not found.")
+  }
+
+  predicted <- round(mu + user_b + movie_b, 2)
+
+  return(paste0(
+    "Predicted rating for ",
+    desired_user,
+    " on ",
+    desired_movie,
+    " is ",
+    predicted
+  ))
+}
+
+```
+
+Now we can test the three use cases:
+
+### 1. Predicting an unrated movie:
+
+```{r predict-unrated-movie}
+
+predict_rating_2("Vuthy", "StarWarsForce")
+
+```
+
+### 2. Querying a movie the user already rated:
+
+```{r predict-already-viewed-movie-rating}
+
+predict_rating_2("Vuthy", "CaptainAmerica")
+
+```
+
+### 3. Incorrect user/movie input:
+
+```{r predict-incorrectly-spelled-arguments}
+
+predict_rating_2("Vooothy", "CaptainAmerica")
+
+```
+
+# Conclusion
+
+In completing this assignment, it became clear that the Global Baseline Estimate provides a structured yet straightforward way to generate rating predictions. By combining the global mean with both the user and movie bias terms, the model accounts for overall rating tendencies whilst also adjusting for systematic differences across individual users and films. Although this approach does not incorporate similarity-based personalization like collaborative filtering, it still offers a transparent and computationally efficient foundation for recommendation work. Overall, I can say that this implementation highlights how even relatively simple algorithms can produce meaningful and logically grounded predictions, when the utilized components are carefully calculated and applied.
+
+## LLM Used
+
+-   OpenAI. (2026). *ChatGPT (Version 4o)* \[Large language model\]. [https://chat.openai.com](https://chat.openai.com/) . Accessed February 14, 2026.
