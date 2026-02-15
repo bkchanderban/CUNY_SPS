@@ -96,7 +96,7 @@ head(crypto_prices)
 
 ```
 
-Successfully calling forth the data and assigning it into a dataframe(crypto_prices), we can observe that there are approximately 3,012 rows within the dataframe, as well as 8 columns. Of those 8, the 3 that we will focus on are those of: symbol, date, and close. The dataframe will thus be subsetted to concentrate upon these variables.
+Successfully calling forth the data and assigning it into a dataframe(crypto_prices), we can observe that there are approximately 3,010 rows within the dataframe, as well as 8 columns. Of those 8, the 3 that we will focus on are those of: symbol, date, and close. The dataframe will thus be subsetted to concentrate upon these variables.
 
 ```{r subset-crypto-prices}
 
