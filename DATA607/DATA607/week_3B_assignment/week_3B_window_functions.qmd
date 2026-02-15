@@ -9,7 +9,7 @@ execute:
 
 # Introduction/Approach
 
-The objective of this week 3B assignment is to apply window functions to time series data so as to compute both rolling and cumulative summary statistics. More specifically, this task requires the calculation of:
+The objective of this week 3B assignment is to apply window functions to time series data in order to compute both rolling and cumulative summary statistics. More specifically, this task requires the calculation of:
 
 -   The year-to-date (YTD ) average, and
 
@@ -17,7 +17,7 @@ The objective of this week 3B assignment is to apply window functions to time se
 
 for two or more separate time-series items.
 
-For this assignment, I plan to use end-of-day Bitcoin and Ethereum prices (beginning January 1st, 2022 to present) in order to showcase grouped window functionality across multiple instruments.
+For this assignment, I plan to use end-of-day Bitcoin and Ethereum prices (beginning January 1st, 2022 to present day, February 14th, 2026) in order to showcase grouped window functionality across multiple instruments.
 
 All calculations will be executed within R using the dplyr package, utilizing grouped window operations here rather than via SQL.
 
@@ -33,15 +33,21 @@ The dataset to be analyzed will likely consist of three principal components:
 
 The data may be obtained from a public finance API (such as Yahoo Finance, or some other cryptocurrency data provider) and then imported within RStudio as a dataframe.
 
-In order to properly calculate the desired summary statistics, the data must be sorted in chronological order, contain no missing values (or, if present, be handled accordingly), and include more than one instrument so as to demonstrate and make use of grouped window calculations.
+In order to properly calculate the desired summary statistics, the data must:
+
+-   Be sorted into chronological order,
+
+-   Contain no missing values (or, if present, be handled accordingly), and
+
+-   Include more than one instrument so as to demonstrate and make use of grouped window calculations.
 
 ## Anticipated Challenges
 
--   Ensuring that the data is in fact arranged within chronological order before applying calculations for the rolling averages.
+-   Ensuring that the data is arranged in chronological order prior to applying rolling average calculations.
 
 -   Making sure that the YTD average resets at the start of each new calendar year within the dataset.
 
--   Ensuring that the grouped window functions operate independently across the different examined instruments (BTC and ETH).
+-   Ensuring that grouped window functions operate independently across the different examined instruments (BTC and ETH).
 
 ## Optional Endeavor
 
@@ -54,3 +60,188 @@ In this assignment, I may generate plots to visually depict:
 -   The six-day moving average on a time-series graph.
 
 Such visualizations as above would serve to reinforce the interpretations garnered from the window calculations.
+
+# Code Base (Body)
+
+Upon some further investigation, a package by the name of "tidyquant" was discovered and installed.
+
+```{r install-tidyquant-package}
+
+install.packages("tidyquant")
+
+```
+
+This package enables the retrieval of financial time-series data (such as the desired cryptocurrency prices, and even stock prices) directly into RStudio, while maintaining compatibility with tidyverse workflows.
+
+Subsequently, the libraries to be utilized within the scope of this analysis were loaded.
+
+```{r load-libraries}
+
+library(tidyquant)
+library(dplyr)
+```
+
+Now, the financial cryptocurrency data (end-of-day prices for BTC and ETH) will be called forth using the tq_get() functionality.
+
+```{r import-financial-data}
+
+crypto_prices <- tq_get(
+  c("BTC-USD","ETH-USD"),
+  from = "2022-01-01",
+  to = "2026-02-13"
+)
+
+glimpse(crypto_prices)
+head(crypto_prices)
+
+```
+
+Successfully calling forth the data and assigning it into a dataframe(crypto_prices), we can observe that there are approximately 3,012 rows within the dataframe, as well as 8 columns. Of those 8, the 3 that we will focus on are those of: symbol, date, and close. The dataframe will thus be subsetted to concentrate upon these variables.
+
+```{r subset-crypto-prices}
+
+crypto_data <- crypto_prices %>%
+  select(symbol, date, close)
+
+glimpse(crypto_data)
+head(crypto_data)
+unique(crypto_data$symbol)
+
+```
+
+Now that we have isolated the variables of interest, the next vital step is to ensure that the data is properly arranged in chronological order for each of the instruments. This is necessary since the window functions are dependent upon the correct ordering of observations.
+
+```{r arrange-chronologically}
+
+crypto_data <- crypto_data %>%
+  arrange(symbol, date)
+
+head(crypto_data)
+
+```
+
+## Creating a Year Variable
+
+Since one of the principal goals of this analysis involves computing a Year-To-Date (YTD) average, it makes logical sense that we must possess a year variable to compute that statistic correctly. Therefore, we extract the calendar year from the date variable, allowing the YTD calculation to reset at the start of each new year.
+
+```{r extract-year}
+library(lubridate)
+
+crypto_data <- crypto_data %>%
+  mutate(year = lubridate::year(date))
+
+head(crypto_data)
+unique(crypto_data$year)
+
+```
+
+## Calculating the YTD Average
+
+The YTD average is a cumulative average computed within the time window of a given year, and for each specific examined instrument (BTC-USD and ETH-USD).
+
+This average, grouped by symbol and year, is computed below.
+
+```{r calculate-ytd-average}
+
+crypto_data <- crypto_data %>%
+  group_by(symbol, year) %>%
+  arrange(date, .by_group = TRUE) %>%
+  mutate(
+    ytd_avg = cumsum(close) / row_number()
+  ) %>%
+  ungroup()
+
+head(crypto_data)
+
+```
+
+In the calculations above, grouping by both symbol and year ensures that BTC and ETH are handled independently, and also allows the YTD average to reset at the start of each new calendar year. The cumsum() function calculates the cumulative sum of closing prices, and row_number() tracks how many observations have occurred so far within that year, which allows the running average to be computed at each row.
+
+## Calculating the Six-Day Moving Average
+
+A primary difference between the YTD and the six-day moving average is that the six-day average (unlike YTD, which accumulates from the start of the given year) only takes the most recent six days into account.
+
+For this calculation, the slider package will be installed and loaded. This package is particularly useful rolling statistics (like moving averages), since it allows control over the window size and whether partial windows are permitted.
+
+```{r install-slider-package}
+
+install.packages("slider")
+library(slider)
+```
+
+Next, we calculate the six-day moving average for each instrument in the crypto_data dataset. One thing to note pertains to the first five observations. Since there are not yet six days of prior values available, we set .complete = TRUE, which causes those early rows to return NA (a common and reasonable approach). The .before argument in turn defines how many observations preceding the current element should be included within the sliding window. Since we want to focus on the previous six days (inclusive of the current day), we shall set this argument as being equal to 5.
+
+```{r calculate-six-day-moving-average}
+
+crypto_data <- crypto_data %>%
+  group_by(symbol) %>%
+  arrange(date, .by_group = TRUE) %>%
+  mutate(
+    mov_avg_6day = slide_dbl(
+     close,
+     mean,
+     .before = 5,
+     .complete = TRUE
+      
+    )
+  ) %>%
+  ungroup()
+
+head(crypto_data)
+tail(crypto_data)
+
+```
+
+As shown in the output, the first five observations are encoded as NA for the six-day moving average, while observations from day six onward contain valid moving-average values. For example, on **2022-01-06**, the sum of the previous 6 days closing values (from **2022-01-01** through **2022-01-06)** is that of **274,117.65**. The prior figure, once divided by 6, results in **45,686.275**, which corresponds to the figure above.
+
+# Optional Endeavor: Visualization
+
+As mentioned in the approach, one pathway to further examine the data is visualization, which allows for easier discernment of trends over time. In the depiction below, a comparison between the closing price versus he six-day moving average is plotted for both cryptocurrencies. These comparisons are placed side by side for easier assessment.
+
+```{r plot-moving-averages-vs-closing}
+library(ggplot2)
+
+ggplot(crypto_data, aes(x = date)) +
+  geom_line(aes(y = close, color = "Closing Price")) +
+  geom_line(aes(y = mov_avg_6day, color = "Six-Day Moving Avg.")) +
+  facet_wrap(~ symbol, scales = "free_y") +
+  labs(
+    title = "BTC and ETH Closing Prices with 6-Day Moving Average",
+    y = "Price",
+    x = "Date"
+  ) +
+  theme_minimal()
+```
+
+Both Bitcoin and Ethereum display clear inclines and declines throughout the years, with prices notably dropping in 2022, rising strongly into 2024 and 2025, then becoming more unstable yet again toward current times.
+
+Another comparison that may be drawn relates to the relationship between the closing prices and the YTD averages. This relation will be depicted in the graph below.
+
+```{r plot-closing-vs-ytd}
+
+ggplot(crypto_data, aes(x = date)) +
+  geom_line(aes(y = close, color = "Closing Price"), alpha = 0.6) +
+  geom_line(aes(y = ytd_avg, color = "YTD Average"), size = 1) +
+  facet_wrap(~ symbol, scales = "free_y") +
+  labs(
+    title = "Closing Price vs Year-to-Date (YTD) Average",
+    x = "Date",
+    y = "Price (USD)",
+    color = "Legend"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5)
+  )
+
+```
+
+In looking at the above graph, the YTD average appears to be smoother than the six-day moving average since it is calculated using all observations from the beginning of the year up to each given date, which in turn dampens the short-term fluctuations. In contrast, the six-day moving average only considers a small recent window of data, making it more responsive to daily price swings and therefore more variable.
+
+# Conclusion
+
+In fulfilling the requirements of this assignment, it became quite lucid that window functions provide a highly effective means for calculating cumulative and rolling statistics within time-series data. In this scenario, I used grouped operations in the dplyr library to compute both the six-day moving average and the year-to-date (YTD) average for Bitcoin and Ethereum. Each instrument was handled in its own grouping context, and the exercise in and of itself compounded the importance of proper chronological sequencing and grouping when conducting time-series analysis.
+
+## LLM Used
+
+-   OpenAI. (2026). *ChatGPT (Version 4o)* \[Large language model\]. [https://chat.openai.com](https://chat.openai.com/) . Accessed February 14, 2026.
