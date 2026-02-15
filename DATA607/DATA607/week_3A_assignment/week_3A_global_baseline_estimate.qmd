@@ -268,7 +268,7 @@ cat("\nMatt's predicted rating for JungleBook is:", predict_rating_1("Matt","Jun
 
 Now, we can also simulate a case where the user or movie name is incorrect.
 
-```{r test-predictor-function-one}
+```{r test-predictor-function-one-part-two}
 
 predict_rating_1("Mat","Joonglebook")
 ```
