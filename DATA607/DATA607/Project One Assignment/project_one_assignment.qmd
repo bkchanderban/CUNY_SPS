@@ -1,0 +1,74 @@
+---
+title: "project_one_assignment"
+author: "Brandon Chanderban"
+format: html
+editor: visual
+execute: 
+  echo: true
+---
+
+# Introduction/Approach
+
+The objective of this Project One exercise is to extract and analyze structured information from a text file containing chest tournament results. The provided dataset is not in a tidy format, but rather, is presented as a formatted cross table harboring facets such as player identifiers, ratings, and round by round results.
+
+As such, the primary goal of this assignment will therefore involve parsing the raw text file and transforming it into a structured dataframe for analysis within R. Additionally, beyond the aim of extraction, this project also requires the calculation of each player's average pre-tournament ratings of their opponents, which introduces an additional analytical component to the task.
+
+All of the work will be conducted in R, using packages such as stringr, dplyr, and potentially tidyr to assist with the data transformation process.
+
+## Data Structure
+
+From an initial inspection of the text file, each player instance appears to posses:
+
+-   The player name
+
+-   The player state
+
+-   Their total points
+
+-   USCF ID
+
+-   Their pre-tournament rating
+
+-   Their post-tournament rating
+
+-   Their round by round opponent
+
+However, these values are formatted within text rows separated by divider lines, meaning that precise string parsing will be called for. Moreover, the opponent ratings are not directly housed within a player's row. Instead, only the opponent pair numbers are listed for each round. As such, computing the average opponent pre-rating will require the referencing of the other player's extracted pre-ratings.
+
+## Proposed Plan
+
+The analytical approach will likely follow the steps outlined below:
+
+-   Import the text file using readLines().
+
+-   Identify and subsequently isolate the player record blocks
+
+-   Use regular expressions to extract:
+
+    -   Player name
+
+    -   Player state
+
+    -   Total Points
+
+    -   Pre-Tournament rating
+
+    -   Opponent pair numbers for each round
+
+-   Construct an initial dataframe containing one row per player, inclusive of their pre-rating.
+
+-   Create a look-up structure that maps pair number to pre-rating.
+
+-   For each player, I will then retrieve the list of opponent pair numbers, match them against the corresponding pre-ratings, and compute the average of those pre-ratings, while ensuring that potential complications are addressed, such as accounting for games not played (byes and forfeits) and excluding them from the average calculations.
+
+-   The computed averages will then be appended as a novel variable within the final dataframe.
+
+-   Finally, the completed dataset will be exported to a .csv file using the write.csv() function, as required by the project specifications.
+
+# Anticipated Challenges
+
+One expected challenge involves correctly parsing the inconsistent spacing within the text file. Since the dataset itself is not comma or tab separated, the extraction process will depend heavily on deciphering recurring patterns.
+
+Another focal challenge will be ensuring that the opponent references are correctly matched to the corresponding player records. Because opponent ratings are to be derived indirectly via pair numbers, careful indexing and validation will be required to prevent mismatches from transpiring.
+
+Furthermore, some entries contain instances of provisional ratings (for example, "P" designations), which may require cleaning prior to numeric conversion. Games marked as byes or unplayed rounds must also be considered and excluded from the opponent-average calculations.
