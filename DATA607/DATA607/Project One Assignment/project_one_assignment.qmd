@@ -72,3 +72,270 @@ One expected challenge involves correctly parsing the inconsistent spacing withi
 Another focal challenge will be ensuring that the opponent references are correctly matched to the corresponding player records. Because opponent ratings are to be derived indirectly via pair numbers, careful indexing and validation will be required to prevent mismatches from transpiring.
 
 Furthermore, some entries contain instances of provisional ratings (for example, "P" designations), which may require cleaning prior to numeric conversion. Games marked as byes or unplayed rounds must also be considered and excluded from the opponent-average calculations.
+
+# Code Base/Body
+
+The first step, as per normal, involves loading the required libraries.
+
+```{r load-libraries}
+
+library(dplyr)
+library(stringr)
+library(tidyr)
+```
+
+Next, we will import the contents of the text file, which is housed within my GitHub repository, for the purpose of code reproducibility.
+
+```{r import-text-filel}
+
+url <- "https://raw.githubusercontent.com/bkchanderban/CUNY_SPS/refs/heads/main/DATA607/DATA607/Project%20One%20Assignment/tournamentinfo.txt"
+
+raw_lines <- readLines(url)
+
+length(raw_lines)
+head(raw_lines, 10)
+
+```
+
+As it stands, the previously created raw_lines object serves as a character vector wherein each element represents one line of the text file.
+
+## Removing The Divider Lines
+
+In examining the head of the raw_lines character vector, we can observe that some of the lines (for example, lines 4 and 10) are composed entirely of dashes. These lined are not required in the final players dataframe.
+
+```{r remove-dividers}
+
+clean_lines <- raw_lines[!str_detect(raw_lines,"^[-]+$")]
+
+head(clean_lines, 10)
+
+```
+
+## Identifying The Player Blocks
+
+Currently, within the clean_lines character vector, the record corresponding to each player is spread across two consecutive lines.
+
+The first one contains features such as the pair number, the player name, the total points, and the round results. The second line, on the other hand, contains facets such as the player's state, their USCF ID, and their pre and post-ratings.
+
+As such, we will first strive to isolate/filter only the lines that commence with the pair numbers of the players.
+
+```{r isolate-player-lines-with-pair-nums}
+
+player_line_index <- which(str_detect(clean_lines, "^\\s*\\d+\\s*\\|"))
+
+player_lines <- clean_lines[player_line_index]
+
+length(player_lines)
+head(player_lines,10)
+```
+
+Now, we will attempt to extract the second lines of each player's information (which contains the rating figures).
+
+```{r isolate-player-rating-lines}
+
+rating_lines <- clean_lines[player_line_index + 1]
+
+length(rating_lines)
+head(rating_lines)
+```
+
+## Extracting The Required Player Information
+
+At this stage, our prevailing goal is to extract the core player information from within the isolated lines of player information.
+
+We will first begin by obtaining features from the player_lines character vector, starting with the **pair number**.
+
+```{r extract-pair-nums}
+
+pair_number <- str_extract(player_lines, "^\\s*\\d+") %>%
+  str_trim() %>%
+  as.numeric()
+
+head(pair_number)
+
+```
+
+Next we extract the **players' names**.
+
+```{r extract-names}
+
+player_name <-str_extract(player_lines, "\\|\\s*[A-Z ,.'-]+\\s*\\|") %>%
+  str_remove_all("\\|") %>%
+  str_trim()
+
+head(player_name)
+
+```
+
+Then, we extract the **total number of points**.
+
+```{r extract-total-points}
+
+total_points <- str_extract(player_lines, "\\|\\s*\\d+\\.\\d\\s*\\|") %>%
+  str_remove_all("\\|") %>%
+  str_trim() %>%
+  as.numeric()
+
+head(total_points)
+
+```
+
+Now, we shift our focus to deriving features from within the rating_lines, beginning with the **players' states**.
+
+```{r extract-state}
+
+player_state <- str_extract(rating_lines, "^\\s*[A-Z]{2}") %>%
+  str_trim()
+
+head(player_state, 10)
+
+```
+
+Finally, we extract the players' **pre-ratings**.
+
+```{r extract-pre-rating}
+
+pre_rating <- str_extract(rating_lines, "R:\\s*\\d+") %>%
+  str_extract("\\d+") %>%
+  as.numeric()
+
+head(pre_rating, 10)
+```
+
+## Construct The Initial Players Dataframe
+
+Now that we have obtained all of the players' base components from within the chess tournament ratings text file, we can proceed with the creation of the initial players dataframe.
+
+```{r construct-player-dataframe}
+
+players_df <- tibble(
+  pair_number = pair_number,
+  player_name = player_name,
+  player_state = player_state,
+  total_points = total_points,
+  pre_rating = pre_rating
+  )
+
+head(players_df)
+
+```
+
+## Extract Opponent Pair Numbers
+
+Now in possession of the initial player information dataframe, our next task is to calculate the average pre chess ratings for each player's opponents. In doing so, the first step entails extracting the pair numbers corresponding to each match in which a given player competed.
+
+```{r extract-opponents}
+
+#Extract all the occurrences of a letter followed by spaces and digits from within the player_lines
+
+opponent_list <- str_extract_all(player_lines, "[WLDHUX]\\s*\\d+")
+
+# Extract just the numeric portion
+opponent_list <- lapply(opponent_list, function(x) {
+  as.numeric(str_extract(x, "\\d+"))
+})
+
+head(opponent_list)
+```
+
+Now that we have obtained the pair numbers corresponding to each of players' partaken games, we must convert the obtained resultants into a long format to allow for better analytical examination.
+
+```{r convert-to-long-format}
+
+opponent_df <- tibble(
+  pair_number = pair_number,
+  opponents = opponent_list
+  ) %>%
+  unnest(opponents)
+
+head(opponent_df, 10)
+
+```
+
+## Map The Opponent Pair Numbers To Pre-Rating
+
+Now that we have a tidy dataframe containing the players' pair numbers and their opponents', the next step involves appending the opponents' pre-rating figures to the dataframe. This will be accomplished by joining the opponent_df to the players_df.
+
+```{r join-opponent-pre-ratings}
+
+opponent_df <- opponent_df %>%
+  left_join(
+    players_df %>% select (pair_number, pre_rating),
+    by = c("opponents" = "pair_number")
+    )
+
+opponent_df
+```
+
+## Compute The Average Opponent Pre-Rating
+
+Now that our opponent_df dataframe has been updated to include the opponents' pre-ratings, we can calculate the average pre-chess ratings of each player's opponents.
+
+```{r compute-average-opponent-ratings}
+
+avg_opponent_rating <- opponent_df %>%
+  group_by(pair_number) %>%
+  summarise(avg_opponents_pre_rating = round(mean(pre_rating, na.rm = TRUE)))
+#Note in the above calculation of the average, the resultant was rounded to reflect the given example of GARY HUA. In this, his pre chess opponent average was given as 1605, instead of 1605.286...
+
+head(avg_opponent_rating)
+
+```
+
+## Attach Discerned Averages Back To Main Dataframe
+
+As we have obtained the desired figure within this analytical endeavor (the pre-chess rating of each player's opponents), we can attach these values to our final dataframe.
+
+```{r attach-averages-to-final-df}
+
+final_df <- players_df %>%
+  left_join(avg_opponent_rating, by = "pair_number")
+
+head(final_df)
+
+```
+
+## Sanity Check
+
+Using the data from within the original text file, the opponent pre-ratings for two players were hand-calculated.
+
+The first player Anvit Rao (pair number of 10) participated in all seven matches, and his opponents had an average pre-rating score of 1,554 (1,554.1428571429).
+
+```{r test-anvit-rao-opponents-pre-rating-avg}
+
+final_df %>% filter(pair_number == 10)
+
+```
+
+The second player Eugene L McClure (pair number of 22) participated in six of the seven rounds, and his opponents had an average pre-rating score of 1,300 (1,300.333...).
+
+```{r test-eugene-mclure-opponents-pre-rating-avg}
+
+final_df %>% filter(pair_number == 22) 
+
+
+```
+
+## Export To CSV
+
+Our final_df dataframe now contains the required components of a player's pair number, name, state, total points, their own pre-rating, and the average pre chess rating of their opponents. The final requirement of the Project One assignment involves exporting this dataframe to a CSV file, which can then be imported into an SQL database for further analysis.
+
+```{r export-to-csv}
+
+write.csv(
+  final_df %>%
+    select(player_name, player_state, total_points, pre_rating, avg_opponents_pre_rating), "tournament_results.csv",
+  row.names = FALSE
+)
+
+```
+
+# Conclusion
+
+In completing this assignment, it became evident that unrefined yet structured data can be systematically transformed into meaningful analytical resultants. In the case of this project, this transformation process involved precise parsing and relational mapping. Moreover, string manipulation techniques were drawn upon alongside the dplyr library's grouping functionality in order to extract the required player information and compute the sought after average pre-chess opponent ratings.
+
+With respect to the most technically demanding portion of the project's execution, I would attribute that to the parsing process itself. This step required close attention to detail, as well as multiple iterations, in order to achieve the desired functionality.
+
+## LLM Used
+
+-   OpenAI. (2026). *ChatGPT (Version 4o)* \[Large language model\]. [https://chat.openai.com](https://chat.openai.com/) . Accessed February 21, 2026.
