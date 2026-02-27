@@ -1,0 +1,58 @@
+---
+title: "week_5B_assignment"
+author: "Brandon Chanderban"
+format: html
+editor: visual
+execute: 
+  echo: true
+---
+
+# Introduction/Approach
+
+The objective for this Week 5B assignment is to evaluate how each player (within the Project One chess tournament dataset) performed relative to what would be expected based upon the ELO rating differences between them and each of their opponents. Using each player's pre-tournament rating and the pre-tournament ratings of each of their opponents, we will attempt to compute an expected score across the entirety of the tournament (for instance, 4.3 points across the 7 played matches), compare it to the player's actual obtained points, and then identify the five players who would have most overperformed and most underperformed relative to their expectations.
+
+With reference to the ELO expected score formula, this will be sourced from a reasonable reference, such as Professor Catlin's provided video: *The Elo Rating System for Chess and Beyond*. Feb 15, 2019. \[video, 7m\]
+
+## Data Structure
+
+This assignment requires a player=to=opponent mapping, because the expected score is computed per opponent (then summed). Based on the completed Project One, the two key structures to be utilized are:
+
+-   A player-level table comprising features such as pair number, player name, total points (the player's actual score), and the player's pre-rating.
+
+-   An opponent-level table containing multiple rows per each player, with one row mapping to each opponent across the played rounds. This table includes features such as the player's pair number, the opponents' pair numbers, as well as the opponents' pre-ratings.
+
+Using the above data, the expected scores can be calculated per match-up and then aggregated to determine the expected score per player (in a one-row-per-player summary table).
+
+## Proposed Plan
+
+The analytical approach will likely follow the steps outlined below:
+
+-   Reuse the cleaned Project One outputs rather than re-parsing the raw tournament text file.
+
+-   In doing so, we must ensure that we have:
+
+    -   each player's pre-rating and total points, as well as
+
+    -   each player's list of opponents with opponent pre-ratings.
+
+-   Compute the expected score per each of the match-ups using the standard ELO expected score formula below:
+
+![](images/clipboard-1814652310.png)
+
+-   In the above, the RA represents the player's pre-rating and the RB is the opponent's pre-rating. The formula should output an expected value per match-up (ranging between 0 and 1).
+
+-   Once the above has been calculated for each match-up, we can then group by the player's pair number and sum the expected match-up scores across all rounds to obtain their expected points.
+
+-   The opponent-level table containing each player's expected points can then be joined back to the player-level table, allowing us to then calculate the difference between total points (actual performance) and expected performance.
+
+-   We will then sort by these performance differences to determine the top 5 overperformers and the top 5 underperformers.
+
+## Anticipated Challenges
+
+One expected challenge lies in ensuring the join logic is correct and that the opponent pre-ratings correspond accurately to each player-round entry. Even small join errors can produce seemingly plausible looking outputs, so validation checks may be called for.
+
+## Optional Endeavors
+
+-   Include plots exhibiting the distribution of performance differences for the top and bottom performers.
+
+-   Include hand-calculated validations for one or two players, ensuring that the expected score calculations match the R outputs.
