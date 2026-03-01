@@ -35,7 +35,7 @@ The analytical approach will likely follow the steps outlined below:
 
     -   each player's list of opponents with opponent pre-ratings.
 
--   Compute the expected score per each of the match-ups using the standard ELO expected score formula below:
+-   Compute the expected score per each of the match-ups using the standard ELO expected score formula below (singingbanana, 2019; Glickman, n.d.):
 
 ![](images/clipboard-1814652310.png)
 
@@ -56,3 +56,175 @@ One expected challenge lies in ensuring the join logic is correct and that the o
 -   Include plots exhibiting the distribution of performance differences for the top and bottom performers.
 
 -   Include hand-calculated validations for one or two players, ensuring that the expected score calculations match the R outputs.
+
+# Code Base/Body
+
+As mentioned within the outlined approach of the previous section, the two pieces of data to be drawn upon in the course of this analysis are the player-level and the opponent-level tables (extracted from the raw chess tournament results text file) from within Project One.
+
+To transfer these tables over to this working directory, the Project One Quarto document was revisited and the two desired tables were written to CSV files, which were then pushed to my personal GitHub repository. They are then read in as dataframes once more as follows (after loading in the required library, as per usual).
+
+```{r load-libraries}
+
+library(tidyverse)
+```
+
+```{r import-data}
+
+player_url <- "https://raw.githubusercontent.com/bkchanderban/CUNY_SPS/refs/heads/main/DATA607/DATA607/week_5B_assignment/player_level.csv"
+
+opponent_url <- "https://raw.githubusercontent.com/bkchanderban/CUNY_SPS/refs/heads/main/DATA607/DATA607/week_5B_assignment/opponent_level.csv"
+
+player_df <- read_csv(player_url, show_col_types = FALSE)
+opp_df <- read_csv(opponent_url, show_col_types = FALSE)
+
+glimpse(player_df)
+glimpse(opp_df)
+
+```
+
+Now that we have obtained the required player and opponent dataframes, our next step is to conduct some feature engineering; principally, renaming the pre_rating column within the opp_df to opponent_pre_rating to avoid confusion down the line.
+
+```{r clean-opp-dataframe}
+
+opp_df <- opp_df %>%
+  rename(opponent_pre_rating = pre_rating)
+head(opp_df)
+
+```
+
+Now, we can attach (to the opp_df) each player's own pre-rating by joining based upon the coinciding pair numbers.
+
+```{r attach-each-players-pre-rating}
+
+matchups <- opp_df %>%
+  left_join(
+    player_df %>% select(pair_number, pre_rating),
+    by = "pair_number"
+  ) %>%
+  rename (player_pre_rating = pre_rating)
+
+glimpse(matchups)
+head(matchups, 9)
+```
+
+Next, the task is that of computing the expected score per matchup using the ELO formula/calculation (singingbanana, 2019; Glickman, n.d.).
+
+```{r compute-expected-score-per-matchup}
+
+matchups <- matchups %>%
+  mutate(expected_score = 1 / (1 + 10^((opponent_pre_rating - player_pre_rating) / 400)))
+  
+matchups %>% select(pair_number, opponents, player_pre_rating, opponent_pre_rating, expected_score) %>% head(n = 9)
+
+```
+
+Given that we would have just calculated the expected score gained per matchup for each of the players' partaken rounds, our next step is to sum these expected scores in order to determine the expected tournament score per player.
+
+```{r sum-expected-scores-per-matchup}
+
+expected_by_player <- matchups %>%
+  group_by(pair_number) %>%
+  summarise(expected_points = sum(expected_score), .groups = "drop")
+
+head(expected_by_player, 9)
+```
+
+Now that we are in possession of each player's expected points throughout the entirety of the tournament, our next goal is to determine the difference between their actual scores and their predicted ones. Following this, we will then be able to ascertain the top 5 overperformers and top 5 underperformers.
+
+```{r compute-difference-actual-vs-expected-score}
+
+performance <- player_df %>%
+  left_join(expected_by_player, by = "pair_number") %>%
+  mutate(
+    difference = total_points - expected_points
+  ) %>% arrange(desc(difference))
+
+performance %>% select(pair_number, player_name, total_points, expected_points, difference) %>% head(n = 9)
+
+```
+
+## Top 5 Overperformers
+
+In determining the top 5 overperforming players within the chess tournament, all that needs to be done is to sort the performance dataframe in descending order of the difference column (that is, the difference between the players' total points and their expected points).
+
+```{r determine-top-five-overperformers}
+
+top_overperformers <- performance %>%
+  arrange(desc(difference)) %>%
+  slice_head(n = 5) %>%
+  select(pair_number, player_name, total_points, expected_points, difference)
+
+top_overperformers
+```
+
+## Top 5 Underperformers
+
+Conversely, to obtain the top 5 underperformers from the chess tournament, we simply sort the difference column of the performance dataframe in ascending order.
+
+```{r determine-top-five-underperformers}
+
+top_underperformers <- performance %>%
+  arrange(difference) %>%
+  slice_head(n = 5) %>%
+  select(pair_number, player_name, total_points, expected_points, difference)
+
+top_underperformers
+
+```
+
+Now that we've obtained the names of the top 5 over- and under-performing chess participants, I will perform a hand calculation for one player to ensure that the derived expected points (and thus the difference between total/actual and expected points) is accurate. This hand validation will be done for the top underperformer, the player with the pair number of 25, Loren Schwiebert.
+
+In this calculation, using the data from the opp_df, we can see that Loren partook in the following matchups:
+
+```{r select-lorens-matchups}
+
+opp_df %>%
+  filter(pair_number == 25)
+
+```
+
+Using the ELO expected-score formula (singingbanana, 2019; Glickman, n.d.), Loren's expected scores for each round, in the above order, are: **0.8724**, **0.8835**, **0.8888**, **0.9512**, **0.8799**, **0.8991**, and **0.9007**. To determine his total expected score for the entirety of the tournament, we simply add these figures, which yields **6.2757**. In observing the table of the top 5 underperformers, we can see that this matches the figure in the expected_points column for Loren (**6.275650**), and would therefore result in approximately the same value in the difference column if substituted in place.
+
+## Visualize the Distribution of Performance Differences for the Top and Bottom Performers
+
+Now that we have validated our findings regarding the performance differences of players within the chess tournament, one final step is to visualize these differences between expected points and the total/actual points obtained.
+
+```{r visualize-top-and-bottom-performers}
+
+top_bottom_10 <- bind_rows(
+  top_underperformers %>% mutate(group = "Underperformers"),
+  top_overperformers %>% mutate(group = "Overperformers")
+) %>%
+  mutate(player_name = forcats::fct_reorder(player_name, difference))
+
+ggplot(top_bottom_10, aes(x = player_name, y = difference, fill = group)) +
+  geom_col() +
+  geom_hline(yintercept = 0) +
+  coord_flip() +
+  scale_fill_manual(values = c(
+    "Overperformers" = "seagreen3",
+    "Underperformers" = "pink2"
+  )) +
+  labs(
+    title = "Top 5 Underperformers and Top 5 Overperformers (Actual - Expected)",
+    x = "Player",
+    y = "Performance difference (points)",
+    fill = ""
+  ) +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+# Conclusion
+
+In completing this Week 5B ELO calculations assignment, the Project One tournament data were used to compare each player’s actual performance against what would be expected based on their pre-tournament rating differences across seven matchups. Using the standard ELO expected-score formula (singingbanana, 2019; Glickman, n.d.), an expected score was calculated for each player-opponent pairing, summed to produce each player’s total expected points, and then compared to the player’s actual total points to obtain a performance difference (actual minus expected).
+
+From this, the five players who most overperformed relative to their expectations and the five who most underperformed were identified, demonstrating how tournament outcomes can differ from rating-based predictions due to variability exisiting within individual matchups. Overall, although the results show that ELO provides a strong baseline for expected performance, individual tournament play can still produce notable over and underperformance with respect to those expectations.
+
+## References
+
+-   Glickman, M. E. (n.d.). *A comprehensive guide to chess ratings* \[PDF\]. Glicko.net.
+
+-   OpenAI. (2026). *ChatGPT (Version 4o)* \[Large language model\]. [https://chat.openai.com](https://chat.openai.com/) . Accessed February 28, 2026.
+
+-   singingbanana. (2019, February 15). *The Elo rating system for chess and beyond* \[Video\]. YouTube.
