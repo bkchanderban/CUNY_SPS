@@ -61,4 +61,231 @@ Additionally, the analytical write up must clearly explain any mismatch between 
 
 -   Provide a table/chart for both the overall delay rate comparison and the city-by-city delay rate comparison.
 
--   Include at least one hand-calculated validation (for both the overall and city-by-city delay rate calculations), to ensure that it matches the outputted R calculations.
+# Code Base/Body
+
+As with preliminary data cleaning, the first step involves importing the required libraries.
+
+```{r import-libraries}
+
+library(tidyverse)
+library(janitor)
+```
+
+Next, we will import the reconstructed raw CSV file (initially created within Excel, then saved as a CSV file, and housed within my GitHub repository).
+
+```{r import-csv-airline-delays-file}
+
+csv_url <- "https://raw.githubusercontent.com/bkchanderban/CUNY_SPS/refs/heads/main/DATA607/DATA607/week_5A_assignment/recreated%20airline%20delays%20data%20table.csv"
+
+delays_raw_wide <- read.csv(csv_url, stringsAsFactors = FALSE, check.names = FALSE)
+
+head(delays_raw_wide)
+glimpse(delays_raw_wide)
+
+```
+
+Now that we have imported our recreated airline delays CSV file, the next stage in the analysis involves cleaning the wide table.
+
+```{r clean-wide-table}
+
+#Rename the two unnamed columns
+delays_wide <- delays_raw_wide %>%
+  rename(
+    airline = 1,
+    status = 2
+  )
+
+#Remove the blank separator row between the two airlines
+city_cols <- c("Los Angeles", "Phoenix", "San Diego", "San Francisco", "Seattle")
+
+delays_wide <- delays_wide %>%
+  mutate(
+    airline = na_if(airline, ""),
+    status  = na_if(status, "")
+  ) %>%
+  filter(!(is.na(airline) & is.na(status) & if_all(all_of(city_cols), ~ is.na(.x) | .x == "")))
+
+#Ensure that the airline is filled down
+delays_wide <- delays_wide %>%
+  fill(airline, .direction = "down")
+
+#Strip commas within flight counts and convert to numeric
+delays_wide <- delays_wide %>%
+  mutate(across(all_of(city_cols), ~ str_replace_all(as.character(.x),",", ""))) %>%
+  mutate(across(all_of(city_cols), as.numeric))
+
+delays_wide
+glimpse(delays_wide)
+  
+
+```
+
+Now that we have cleaned the delays_wide data object, we can convert it from wide to long formatting for easier analysis.
+
+```{r convert-to-long-format}
+
+delays_long <- delays_wide %>%
+  pivot_longer(
+    cols = all_of(city_cols),
+    names_to = "city",
+    values_to = "count"
+  ) %>%
+  mutate(
+    status = str_to_lower(str_squish(status)),
+    airline = str_squish(airline)
+  )
+
+delays_long
+
+```
+
+## Overall Comparisons: Delay Rate by Airline
+
+Given that our data is now in long format, we are at a stage where we can discern the overall delay rates for each airline. This will be computed as follows:
+
+```{r compute-overall-delay-rates}
+
+overall_rates <- delays_long %>%
+  group_by(airline) %>%
+  summarise(
+    total_flights = sum(count),
+    delayed_flights = sum(count[status == 'delayed']),
+    delay_rate = round((delayed_flights/total_flights*100),2),
+    .groups = "drop"
+  )
+overall_rates
+```
+
+As can be viewed in the table above, we can see that although AM West has a greater number of delayed flights than Alaska airlines does, it (AM West) actually features a lower overall delay rate (10.89%), owing to its larger number of total flights. In contrast, although Alaska has a lower number of delayed flights (501 compared to AM West's 787), because those 501 delays make up a greater portion of Alaska's overall flights (which are fewer in number than AM West's), Alaska's resulting delay rate is higher.
+
+An illustration setting out the above with more clarity will be presented below.
+
+```{r overall-delay-rate-plot}
+
+plot_overall <- overall_rates %>%
+  mutate(on_time_flights = total_flights - delayed_flights) %>%
+  select(airline, on_time_flights, delayed_flights, total_flights, delay_rate) %>%
+  pivot_longer(
+    cols = c(on_time_flights, delayed_flights),
+    names_to = "flight_status",
+    values_to = "flights"
+  ) %>%
+  mutate(
+    flight_status = recode(
+      flight_status,
+      on_time_flights = "On time",
+      delayed_flights = "Delayed"
+    )
+  )
+
+ggplot(plot_overall, aes(x = airline, y = flights, fill = flight_status)) +
+  geom_col() +
+  geom_text(
+    data = overall_rates,
+    aes(
+      x = airline,
+      y = total_flights,
+      label = paste0(
+        "Delay rate: ", delay_rate, "% (",
+        delayed_flights, "/", total_flights, ")"
+      )
+    ),
+    vjust = -0.4,
+    inherit.aes = FALSE
+  ) +
+  labs(
+    title = "Overall Flights and Delay Rate by Airline",
+    x = "Airline",
+    y = "Number of flights",
+    fill = ""
+  ) +
+  expand_limits(y = max(overall_rates$total_flights) * 1.10) +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+## City-by-City Comparisons: Delay Rate by Airline within Each City
+
+Now that we have the overall delay rates for each of the two airlines, our next task entails calculating the delay rate that each airline exhibits at each of the five destinations.
+
+```{r compute-city-by-city-delay-rates}
+
+city_rates <- delays_long %>%
+  group_by(airline, city) %>%
+  summarise(
+    total_flights = sum(count),
+    delayed_flights = sum(count[status == 'delayed']),
+    delay_rate = round((delayed_flights/total_flights*100),2),
+    .groups = "drop"
+  )
+
+city_rates
+```
+
+An illustraton setting out the delay rates by city and airline will be presented below for additional clarity.
+
+```{r city-by-city-delay-rate-plot}
+
+# Build a city-by-city plotting table
+plot_city <- delays_long %>%
+  group_by(city, airline, status) %>%
+  summarise(flights = sum(count), .groups = "drop") %>%
+  mutate(
+    flight_status = if_else(status == "delayed", "Delayed", "On time"),
+    flight_status = factor(flight_status, levels = c("Delayed", "On time"))  # Delayed on top
+  )
+
+# Create a label table using the city_rates output
+city_labels <- city_rates %>%
+  mutate(
+    label = paste0(
+      delay_rate, "%\n(",
+      delayed_flights, "/", total_flights, ")"
+    )
+  )
+
+# Generate the plot
+ggplot(plot_city, aes(x = airline, y = flights, fill = flight_status)) +
+  geom_col() +
+  geom_text(
+    data = city_labels,
+    aes(x = airline, y = total_flights, label = label),
+    vjust = -0.35,
+    size = 3,
+    lineheight = 0.9,
+    inherit.aes = FALSE
+  ) +
+  facet_wrap(~ city) +
+  labs(
+    title = "City-by-City Flights and Delay Rate by Airline",
+    x = "Airline",
+    y = "Number of flights",
+    fill = ""
+  ) +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    axis.text.x = element_text(angle = 20, hjust = 1)
+  ) +
+  expand_limits(y = max(city_rates$total_flights) * 1.12)
+
+```
+
+In examining the plot above, which sets out the delay rate percentages of each airline at each of the five examined destinations, a key observation is that in all five destinations, Alaska airline exhibits lower delay rates compared to AM West. For example, in Los Angeles, Alaska's delay rate is 11.09% while AM West's was 14.43%, and in San Diego, Alaska's rate is 8.62%, whilst AM West's is 14.51%.
+
+## Describing the Discrepancy
+
+Now, in considering the overall delay rate by airline and the city-by-city delay rate (of the airlines at each of the examined five cities), there does seem to be a discrepancy in the reasoning as to which airline possesses the higher rate of delay. Specifically, how is it that Alaska airlines has a higher overall delay rate (13.27% compared to AM West's 10.89%) and yet appears to have a lower delay rate in each of the five cities when examined city-by-city? This apparent contradiction can be explained using the framework of Simpson's Paradox.
+
+Simpson's Paradox occurs when a pattern observed within subgroups reverses (or substantially changes) once the data has been aggregated. In this context, the key is that the overall delay rate is not a simple average of the five city-level delay rates. Instead, it is a weighted average, where the weights are the numbers of flights each airline has in each city. AM West operates a very large share of its flights in Phoenix (5,255 total flights), where its delay rate is relatively low (7.90%). By contrast, Alaska operates a much larger share of its flights in Seattle (2,146 total flights), where its delay rate is higher (14.21%). Because these high volume cities dominate each airline's totals, they disproportionately influence the overall percentages. As a result, even though Alaska has lower delay rates than AM West in each city when compared directly, Alaska's overall delay rate is pulled upward by having so many flights concentrated in a higher-delay city (Seattle), while AM West's overall delay rate is pulled downward by having most of its flights concentrated in a lower-delay city (Phoenix).
+
+In other words, the discrepancy is not due to any errors or contradiction in the dataset, but rather due to differences in the flight volume distributions across the cities. When the data is aggregated, the cities do not contribute equally to each airline's overall delay rate, and that imbalance is what produces the Simpson's Paradox outcome viewed here.
+
+# Conclusion
+
+In completing this Week 5A Airline Delays assignment, the reconstructed dataset was successfully imported from a wide Excel styled CSV and transformed into a tidy long format suitable for analysis. This reshaping step allowed delay performance to be evaluated both at the overall airline level and at the city-by-city level using percentages rather than raw counts.
+
+From the overall comparison, Alaska recorded a higher aggregate delay rate (13.27%) than AM West (10.89%), suggesting that Alaska performed worse when all flights across the five destinations were pooled together. However, when the same comparison was conducted city-by-city, Alaska displayed a lower delay rate in each of the five cities, meaning that within every destination Alaska was, in observed effect, the better performer. The apparent contradiction between overall and city-level delay results is driven by high volume cities dominating the totals, which is consistent with Simpson's Paradox and shows why aggregate summaries must be considered in context.
+
+## LLM Used
+
+-   OpenAI. (2026). *ChatGPT (Version 4o)* \[Large language model\]. [https://chat.openai.com](https://chat.openai.com/) . Accessed February 28, 2026.
