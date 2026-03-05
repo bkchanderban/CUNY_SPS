@@ -1,0 +1,48 @@
+---
+title: "project__two_assignment"
+author: "Brandon Chanderban"
+format: html
+editor: visual
+execute: 
+  echo: true
+---
+
+# Introduction/Approach
+
+The objective of this Project Two Data Transformations exercise lies in preparing different datasets (three, specifically) for analysis work to be conducted further downstream. Moreover, these three datasets must be drawn from within the confines of the DATA 607 Week 5A Discussion thread, wherein the class' students were tasked with identifying untidy datasets and suggesting possible analytical endeavors that may be performed once the datasets have been tidied. In choosing three of these provided datasets, a key requirement of the project sis that only distinct wide-format untidy datasets must be selected.
+
+Once these three datasets are selected, imported and cleaned within RStudio, the specific analyses requested within the original discussion posts will then be executed, including features such as summary tables, visualizations, and brief explanatory narratives where applicable.
+
+## Prospective Datasets and their Corresponding Analyses
+
+1.  The **first** of the three untidy datasets to be examined was outlined in the discussion post that I myself submitted. This Kaggle dataset contains data pertaining to the crude birth rates of countries and maybe viewed [here.](https://www.kaggle.com/datasets/aungdev/birth-rate-of-countries-world-bank-data?utm_source=chatgpt.com&select=API_SP.DYN.CBRT.IN_DS2_en_csv_v2_5607611.csv) The dataset meets the requirement of being formatted in a wide structure, with the variable of year (1960 to 2023) spread across several columns. Within each record, there are several identifiers such as the **Country Name, Country Code, Indicator Name, and Indicator Code**, followed by the **year-based data columns**.
+
+-   The potential analyses to be executed for this crude birth rate dataset are:
+
+    -   comparing the trends in birth rates over time across different regions/countries,
+
+    -   visualizing birth rate trends over time, and
+
+    -   examining the declines and increases in birth rates to identify any widely shared population changes (and then attempting to associate such changes with relevant real-world health and economic events).
+
+2.  The **second** dataset to be utilized was posted by classmate Sinem Kilicdere and is another [Kaggle dataset;](https://www.kaggle.com/datasets/annafabris/world-gdp-by-country-1960-2022/data) this one examining GDP by country for the years 1960 to 2022. Similar to the prior dataset, this one is also arranged in a wide format, owing to the horizontal spread of year-based columns. The identifier columns for this dataset are **Country name** **and** **Country code**.
+
+-   The prospective analyses to be conducted using this GDP by Country dataset (as set out by Sinem herself) are:
+
+    -   comparing GDP growth between countries (potentially using a time series graph),
+
+    -   calculating the average GDP across the included years, and
+
+    -   determining the top-performing countries in terms of economic output.
+
+3.  The **third** and final dataset ([viewed here](https://data.worldbank.org/indicator/EG.FEC.RNEW.ZS)) that will be employed within this Project Two was posted by classmate Ciara Bonnett-Jones and contains information pertaining to the renewable energy consumption of countries (represented as a percentage of their final energy consumption). As with both prior datasets, this one is arranged within a wide format, due to the time variable (year) which is spread out horizontally over several columns. In addition to the year columns, this dataset also contains the following variables: **Country Name, Country Code, Indicator Name, and Indicator Code**.
+
+-   The analysis to be conducted as set out by Ciara's discussion post centers on comparing the growth in renewable energy usage across different geographic regions over a ten year period.
+
+## Proposed Plan
+
+For each of the three selected datasets, I will first obtain a raw CSV version of the data that preserves its original wide formatting, and then commit it to my personal GitHub repository. Each dataset will then be imported into RStudio via the read_csv() function, after which a reproducible tidying pipeline will be applied using tidyr and dplyr. The main transformation will involve reshaping the wide year-based columns into a tidy long format using pivot_longer(), followed by general standardization and cleaning such as consistent variable naming and well-document handling of missing or inconsistent values. Finally, I will complete the required Discussion 5A analyses for each dataset using only the tidied version, supported by summary tables, visualizations, and brief narrative interpretations.
+
+## Potential Challenges
+
+One expected challenge involves missing values within the datasets, especially within the earlier examined years. In this, whether rows are retained (with missing values kept as NAs) or filtered out specific analyses will be noted and documented. Additionally, because these selected datasets span a wide range of countries and years, the resulting visualizations may become cluttered if every if plotted at once. As such, there may be cases where only a subset of countries (for instance, the top or bottom performers based on a calculated metric) will be focused on for clarity, while still maintaining a reproducible workflow.
