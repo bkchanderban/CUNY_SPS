@@ -1,0 +1,103 @@
+---
+title: "week_7_html_and_json"
+author: "Brandon Chanderban"
+date:   "March 12, 2026"
+format:
+  html:
+    toc: true
+    code-fold: show
+    theme: flatly
+execute:
+  echo:    true
+  warning: false
+---
+
+# Introduction/Approach
+
+The objective of this Week 7 HTML and JSON assignment is to become more familiar with the structures of HTML and JSON data formats, and to demonstrate how both may be manually created and then imported into RStudio for further usage as data frames. Within the confines of this assignment, the same base dataset will be exhibited in two different file formats (one being an HTML table and the other being a JSON structure) and then loaded into RStudio for comparison.
+
+For the purposes of this assignment, the chosen subject area will be books pertaining to R programming and data analysis. Three books will be selected, with at least one of them containing multiple authors, as set out within the assignment requirements. For each book, the recorded fields will include the **title**, **author/s**, and a number of additional attributes such as **publication year**, **publisher**, and **ISBN**.
+
+Once the two source files have been manually constructed, they will then be imported into RStudio using packages suited to each respective format. The imported objects will then be converted into data frames and compared in order to determine whether the HTML or JSON derived versions of the dataset are similar in structure and content.
+
+## Data Structure
+
+The dataset to be constructed will contain three observations, each corresponding to one selected book. The variables to be included for each record will be those of:
+
+-   title
+
+-   authors
+
+-   publication_year
+
+-   publisher
+
+-   isbn
+
+The same information (pertaining to the variables above) will be represented in two ways:
+
+1.  The HTML file, which will contain a table structure, with one row corresponding to a singe book and one column mapping to each of the variables, and
+
+2.  The JSON file, which will contain the same information in JSON format, likely as an array of book records, where each record is represented as an object with named key-value pairs.
+
+Owing to the fact that one of the books must have multiple authors, special attention will need to be paid in ensuring that the authors field is represented consistently across the two formats.
+
+## Proposed Plan
+
+The analytical approach will likely follow the steps as outlined below.
+
+Firstly, the three books on the identified subject of R programming and data analysis will be selected, ensuring that at least one includes multiple authors. The relevant book details will then be recorded in a consistent manner.
+
+Subsequently, the dataset will be manually encoded into two source files using a plain-text editor on my local computer (for instance, Notepad). These two files being the HTML file containing a table of the book information, and a JSON file containing the same information, only in JSON syntax. These two files will then be saved as books.html and books.json, and uploaded to my public GitHub repository so that they may then be accessed via public web links.
+
+Once this has been done, both files will then be imported into RStudio using suitable packages, converted into data frames, and then compared to determine whether or not they bear identical structures and content.
+
+## Potential Challenges
+
+The primary expected challenge that may be encountered relates to ensuring that the authors field is represented consistently across both formats, particularly in the case of the book with multiple authors. If the authors are stored differently in the source files, then this may lead to inconsistencies when the two data frames are held in comparison (only these differences would have been the result of conflicting raw data, and not typical of the different source formats themselves being imported to RStudio).
+
+## Prospective Books and Their Metadata 
+
+As mentioned prior, the selected subject area will be R programming and data analysis. Three books within this subject area have been chosen, and they satisfy the requirement of at least one containing multiple authors.
+
+The three selected books are as follows:
+
+1.  R for Data Science: Import, Tidy, Transform, Visualize, and Model Data
+
+    -   Authors: Hadley Wickham and Garrett Grolemund
+
+    -   Publication Year: 2017
+
+    -   Publisher: O'Reilly Media
+
+    -   ISBN: 9781491910399
+
+2.  Hands-On Programming with R
+
+    -   Author: Garrett Grolemund
+
+    -   Publication Year: 2014
+
+    -   Publisher: O'Reilly Media
+
+    -   ISBN: 9781449359072
+
+3.  Advanced R (Second Edition)
+
+    -   Author: Hadley Wickham
+
+    -   Publication Year: 2019
+
+    -   Publisher: Chapman and Hall / CRC
+
+    -   ISBN: 9780367255374
+
+Collectively, these aforementioned books provide different levels and perspectives regarding the usage of R, and their information will be manually encoded into both source files for later import and comparison in R.
+
+# References
+
+-   Grolemund, G. (2014). *Hands-on programming with R.* O’Reilly Media.
+
+-   Wickham, H. (2019). *Advanced R (2nd ed.)*. Chapman and Hall/CRC.
+
+-   Wickham, H., & Grolemund, G. (2017). *R for data science: Import, tidy, transform, visualize, and model data.* O’Reilly Media.
