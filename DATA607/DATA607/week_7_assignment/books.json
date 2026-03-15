@@ -1,0 +1,23 @@
+[
+  {
+    "title": "R for Data Science: Import, Tidy, Transform, Visualize, and Model Data",
+    "authors": "Hadley Wickham; Garrett Grolemund",
+    "publication_year": 2017,
+    "publisher": "O'Reilly Media",
+    "isbn": "9781491910399"
+  },
+  {
+    "title": "Hands-On Programming with R",
+    "authors": "Garrett Grolemund",
+    "publication_year": 2014,
+    "publisher": "O'Reilly Media",
+    "isbn": "9781449359072"
+  },
+  {
+    "title": "Advanced R (Second Edition)",
+    "authors": "Hadley Wickham",
+    "publication_year": 2019,
+    "publisher": "Chapman and Hall / CRC",
+    "isbn": "9780367255374"
+  }
+]
