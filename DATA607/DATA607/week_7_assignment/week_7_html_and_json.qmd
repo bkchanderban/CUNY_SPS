@@ -94,6 +94,115 @@ The three selected books are as follows:
 
 Collectively, these aforementioned books provide different levels and perspectives regarding the usage of R, and their information will be manually encoded into both source files for later import and comparison in R.
 
+# Code Base/Body 
+
+The first step pertaining to this Week 7 assignment to be conducted was the creation of the two HTML and JSON source files, containing the metadata information of the three selected R programming and data analysis books.
+
+These files were created within the basic Notepad local application, saved under the required names (books.html and books.json), and then pushed to my personal GitHub repository for downstream referencing.
+
+As we proceed, the second step to be executed is that of loading in the required libraries for reading in both the HTML and JSON source files.
+
+```{r import-libraries}
+
+library(tidyverse)
+library(rvest)
+library(jsonlite)
+```
+
+## Import the HTML file
+
+Now that we have manually created the HTML file and uploaded it to my personal GitHub repository, it may then be read into RStudio by way of the rvest package. Since the HTML file contains a table structure, the information housed within the table itself can be extracted and converted into the desired R data frame.
+
+```{r import-html-file-and-load-to-df}
+
+html_url <- "https://raw.githubusercontent.com/bkchanderban/CUNY_SPS/refs/heads/main/DATA607/DATA607/week_7_assignment/books.html"
+
+books_html <- html_url %>%
+  read_html() %>%
+  html_table(fill = TRUE)
+
+#Take the first table from books_html and save it as a data frame
+books_html_df <- books_html[[1]]
+
+glimpse(books_html_df)
+books_html_df
+```
+
+## Import the JSON file
+
+Our next step entails the importation of the created JSON file, which can now be imported separately by way of the jsonlite package. Since the file itself was created in the form of an array of the three books, it therefore means that it can be read directly into R as a data frame.
+
+```{r import-json-file-and-load-to-df}
+
+json_url <- "https://raw.githubusercontent.com/bkchanderban/CUNY_SPS/refs/heads/main/DATA607/DATA607/week_7_assignment/books.json"
+
+books_json_df <- fromJSON(json_url)
+
+glimpse(books_json_df)
+books_json_df
+```
+
+## Initial Comparison of Our Two Data Frames
+
+At our current stage, both the HTML and JSON source files have been imported into RStudio and stored as two different data frames. This first comparison will be executed before any additional standardization is performed, in order to determine whether or not the two created data frames bear exact resemblance to one another based solely on their imported versions.
+
+```{r initial-comparison-of-data-frames-with-identical}
+
+identical(books_html_df, books_json_df)
+```
+
+```{r initial-comparison-of-data-frames-with-allequal}
+
+all.equal(books_html_df, books_json_df)
+```
+
+In examining the initial comparisons above, we can see that they indicate that the two imported data frames are not strictly identical, as evidenced by the FALSE result outputted by the identical() function. The all.equal() output further clarifies that the differences arise principally from inconsistencies pertaining to the data frames' attributes and data types, rather than from differences within the actual book records themselves.
+
+Particularly, the "isbn" variable would have been interpreted as numeric in one data frame and character in the other. There are also some minor class differences between the two data objects. These discrepancies appear to be somewhat typical when importing data from differing file formats and should be resolved through the subsequent standardization of the variable types.
+
+## Standardizing the Data Types
+
+In order to now ensure that both imported data frames bear the same structure as closely as possible, the relevant fields can now be standardized. In this case, the publication_year variable will be converted to numeric in both data frames, whilst the isbn variable will be set as a character variable (also in both data frames).
+
+```{r standardize-data-types}
+
+books_html_df <- books_html_df %>%
+  mutate(
+    publication_year = as.numeric(publication_year),
+    isbn = as.character(isbn)
+  ) %>%
+  as_tibble()
+
+books_json_df <- books_json_df %>%
+  mutate(
+    publication_year = as.numeric(publication_year),
+    isbn = as.character(isbn)
+  ) %>%
+  as_tibble()
+```
+
+Following the standardization of the variable data types, the only remaining difference between the two imported objects pertained to their class attributes rather than to their actual contents. As such, upon converting their variables to the corresponding data types, both data objects were also converted into the same data frame class (via the as_tibble() function).
+
+## Final Comparison (After Standardization)
+
+Now that the two data frames have been standardized, we can now compare them once more in order to determine whether they are now identical in both structure as well as content.
+
+```{r final-comparison-of-data-frames-with-identical}
+
+identical(books_html_df, books_json_df)
+```
+
+```{r final-comparison-of-data-frames-with-allequal}
+
+all.equal(books_html_df, books_json_df)
+```
+
+Following the standardization of both the variable data types and the data frame classes, the final comparison indicates that the two imported data frames are now identical in both structure and content. This is evidenced by the TRUE outputs returned by both the identical() and all.equal() functions.
+
+# Conclusion
+
+In completing this Week 7 HTML and JSON assignment, the same small dataset of books related to R programming and data analysis was manually constructed in two different source formats, namely HTML and JSON, and then imported into RStudio for comparison. Though the initial imported data frames exhibited slight differences in data types and class attributes, these inconsistencies were resolved through standardization, after which the two data frames were shown to be fully identical. Overall, the exercise demonstrated that while HTML and JSON differ in syntax and structural representation, both may still encode the same underlying information and be converted into equivalent dataframes for downstream analytical use within R.
+
 # References
 
 -   Grolemund, G. (2014). *Hands-on programming with R.* O’Reilly Media.
@@ -101,3 +210,7 @@ Collectively, these aforementioned books provide different levels and perspectiv
 -   Wickham, H. (2019). *Advanced R (2nd ed.)*. Chapman and Hall/CRC.
 
 -   Wickham, H., & Grolemund, G. (2017). *R for data science: Import, tidy, transform, visualize, and model data.* O’Reilly Media.
+
+## LLM Used
+
+-   OpenAI. (2026). *ChatGPT (Version 4o)* \[Large language model\]. [https://chat.openai.com](https://chat.openai.com/) . Accessed March 14, 2026.
