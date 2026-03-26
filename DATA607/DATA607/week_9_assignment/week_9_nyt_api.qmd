@@ -1,0 +1,31 @@
+---
+title: "week_9_nyt_api"
+author: "Brandon Chanderban"
+date:   "March 26, 2026"
+format:
+  html:
+    toc: true
+    code-fold: show
+    theme: flatly
+execute:
+  echo:    true
+  warning: false
+---
+
+# Introduction/Approach
+
+The objective of this assignment is to become familiar with the process of interacting with a public API within R, specifically the New York Times Developer Network, and to demonstrate how data retrieved from an API may be parsed and transformed into a usable data frame for analytical endeavors. In this case, the New York Times Books API will be utilized, which provides access to current and historical best-seller lists. The analysis will be centered around examining author presence within the lists, with the prevailing question being: **Which authors appear most frequently on the New York Times best-seller list within a selected category?**
+
+## Proposed Plan
+
+The analytical approach will likely follow the steps outlined below.
+
+Firstly, an account will be created on the New York Times Developer Network in order to obtain a valid API key. This key will then be stored securely as an environment variable to ensure that it is not hard-coded within the script.
+
+Subsequently, a request will be made to the Books API endpoint, specifically the current best-seller list endpoint, by constructing the appropriate URL and passing the API key as a parameter.
+
+Once the request has been made, the returned JSON response will be imported into R and parsed using the jsonlite package. Given that the Books API response contains nested elements, particularly within the "results" and "books" fields, the relevant components will then be extracted and flattened into the desired tabular structure.
+
+Following this, the extracted data will be converted into a tidy data frame, retaining only the variables of interest such as title, author, rank, and weeks on the list. Any inconsistencies or missing values will have to be identified and addressed during this part of the transformation process.
+
+Finally, the resulting data frame will be used to perform a simple aggregation in order to determine which authors appear most frequently within the selected best-seller list, thereby answering the afore-posed research question.
