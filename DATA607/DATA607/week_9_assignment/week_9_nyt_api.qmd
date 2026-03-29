@@ -29,3 +29,164 @@ Once the request has been made, the returned JSON response will be imported into
 Following this, the extracted data will be converted into a tidy data frame, retaining only the variables of interest such as title, author, rank, and weeks on the list. Any inconsistencies or missing values will have to be identified and addressed during this part of the transformation process.
 
 Finally, the resulting data frame will be used to perform a simple aggregation in order to determine which authors appear most frequently within the selected best-seller list, thereby answering the afore-posed research question.
+
+# Code Base/Body
+
+After an account was created for the NYT Developer Network, a novel app was created (data_607_week_nine) within which the Books API was enabled. Upon saving the app, we are now able to access an API key that will facilitate our linkage to the NYT Books API. This API key was then stored as an environment variable, which was consistent with both the assignment directives and standard practice.
+
+Proceeding, the necessary libraries will be loaded in.
+
+```{r load-libraries}
+
+library(tidyverse)
+library(jsonlite)
+library(gt)
+
+nyt_api_key <- Sys.getenv("NYT_API_KEY")
+```
+
+## Select the API Endpoint and Request
+
+For the scope of this assignment, the selected Books API will be the current Hardcover Fiction best-seller list. The Books API documentation describes the list detail service as a sort of request made to the list endpoint, using the list name and either a date or the term *current*.
+
+```{r construct-the-api-request, echo=TRUE, results='hide'}
+
+nyt_books_url <- paste0(
+  "https://api.nytimes.com/svc/books/v3/lists/current/hardcover-fiction.json?api-key=", nyt_api_key
+)
+```
+
+The request can now be made, after which the derived JSON response can be imported into RStudio.
+
+```{r import-json-response}
+
+nyt_books_raw <- fromJSON(nyt_books_url)
+
+glimpse(nyt_books_raw)
+head(nyt_books_raw)
+```
+
+## Parsing the JSON Response
+
+The Books API returns a nested JSON structure, so the relevant fields must now be explored and extracted from the response.
+
+```{r inspect-response-structure}
+
+names(nyt_books_raw)
+names(nyt_books_raw$results)
+```
+
+Now, the most relevant fields pertaining to the goal of this analysis will be extracted from the books list. These are: title, author, rank, publisher, weeks on list, the books' ISBN numbers, as well as the book descriptions.
+
+```{r parse-boks-to-a-tidy-dataframe}
+
+nyt_books_df <- nyt_books_raw$results$books %>%
+  as_tibble() %>%
+  select(
+    rank,
+    title,
+    author,
+    publisher,
+    weeks_on_list,
+    primary_isbn13,
+    description
+  ) %>%
+  rename(isbn13 = primary_isbn13)
+
+glimpse(nyt_books_df)
+head(nyt_books_df)
+```
+
+At this stage, the Books API response has been converted into a tidy data frame, with one row corresponding to one book presently on the selected best-seller list.
+
+In considering the prior data cleaning decisions that were executed, the initial returned JSON response was nested, so only the desired fields from the book component were extracted into the final data frame. Secondly, the ISBN field was renamed to "isbn13" for additional clarity. We will now move onto the analytical portion of this assignment.
+
+## Analysis: Which Author/s Appear Most Frequently on the Selected Best-Seller List
+
+As set out within the former sections, the guiding question for this assignment is as follows: **Which authors appear most frequently on the selected best-seller list?** This selected list, of course, being the current best-seller list of Hardcover Fiction novels. Since the endpoint returned the current books on a single list, our task entails the counting the number of appearances of each author within said list.
+
+```{r count-frequency-of-authors}
+
+author_frequency <- nyt_books_df %>%
+  count(author, sort = TRUE)
+
+author_frequency
+```
+
+A summary table of the above data frame may also be constructed for easier readability.
+
+```{r construct-author-frequency-summary-table}
+
+author_frequency %>%
+  gt::gt() %>%
+  gt::tab_header(
+    title = "Author Frequency on the Current Hardcover Fiction List",
+    subtitle = "Count of Appearances by Author"
+  ) %>%
+  gt::cols_label(
+    author = "Author",
+    n = "Number of Appearances"
+  )
+```
+
+And finally, the results may also be visualized by way of a simple bar chart.
+
+```{r create-author-frequency-bar-plot}
+
+ggplot(author_frequency, aes(x = reorder(author, n), y = n)) +
+  geom_col() +
+  coord_flip() +
+  labs(
+    title = "Author Frequency on the Current Hardcover Fiction List",
+    x = "Author",
+    y = "Number of Appearances"
+  ) +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+## Additional Analysis: Exploring Matt Dinniman's Books
+
+Since Matt Dinniman was the author appearing the most times within the imported best-seller list for Hardcover Fiction, a further step in the analytical process could (and will) entail examining his book titles.
+
+```{r examine-top-author}
+
+top_author <- author_frequency %>%
+  slice(1) %>%
+  pull(author)
+
+top_author_books <- nyt_books_df %>%
+  filter(author == top_author) %>%
+  select(title, weeks_on_list, description) %>%
+  arrange(desc(weeks_on_list))
+
+top_author_books
+```
+
+As done prior, for the frequency of author appearance on the best-seller list, the above data frame pertaining to Matt Dinniman's books may also be presented in a cleaner-looking table display.
+
+```{r top-author-table}
+
+top_author_books %>%
+  gt::gt() %>%
+  gt::tab_header(
+    title = paste("Books by", top_author, "on the Current List"),
+    subtitle = "Titles, Weeks on List, Descriptions"
+  ) %>%
+  gt::cols_label(
+    title = "Title",
+    weeks_on_list = "Weeks on List",
+    description = "Descriptions"
+  )
+```
+
+## Brief Interpretation
+
+From the frequency table and the corresponding plot, it is evident that most authors appear only once on the current Hardcover Fiction best-seller list. However, *Matt Dinniman* stands out with multiple appearances (four) indicating a notably stronger presence within the list at this point in time. Upon closer examination of his entries, it can be observed that all four books belong to his *Dungeon Crawler Carl* series. Interestingly, the number of weeks each book has spent on the best-seller list appears to correspond with the order of the books within the series, with the earlier installments remaining on the list for longer durations than the more recent entries. This suggests a pattern of sustained reader engagement with the series over time.
+
+# Conclusion
+
+In completing this assignment, the New York Times Books API was successfully accessed through an authenticated request using an environment-stored API key, and the returned JSON response was parsed into a tidy data frame suitable for analysis. From this, it became possible to examine author representation within the current Hardcover Fiction best-seller list and identify a meaningful pattern within the extracted data. Overall, the exercise demonstrated how API-derived JSON data may be securely retrieved, cleaned, and transformed within RStudio for downstream analysis.
+
+## LLM Used
+
+-   OpenAI. (2026). *ChatGPT (Version 4o)* \[Large language model\]. [https://chat.openai.com](https://chat.openai.com/) . Accessed March 28, 2026.
