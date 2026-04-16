@@ -1,0 +1,39 @@
+---
+title: "Week_10A_Sentiment_Analysis"
+author: "Brandon Chanderban"
+date:   "April 15, 2026"
+format:
+  html:
+    toc: true
+    code-fold: show
+    theme: flatly
+execute:
+  echo:    true
+  warning: false
+---
+
+# Introduction/Approach
+
+The objective of this assignment is to become familiar with sentiment analysis in R, specifically through the workflow introduced in Chapter 2 of *Text Mining with R*. In particular, the assignment calls for the reproduction of the chapter's primary sentiment analysis example, followed by an extension of that analysis through the use of a different text corpus and an additional sentiment lexicon.
+
+## Original Example
+
+The primary example from the chapter appears to center on the sentiment analysis of Jane Austen's novels. In reproducing this example, the text will first be transformed into a tidy format and tokenized into individual words. A sentiment lexicon will be joined to the tokenized text in order to classify words according to sentiment, after which the results will then be summarized and visualized. This portion of the assignment will serve to replicate the core analytical process demonstrated in the chapter.
+
+## Extension of the Analysis
+
+Once the original example has been successfully reproduced, the analysis will be extended in two ways. Firstly, a different text corpus will be selected and analyzed using a similar workflow, thereby demonstrating how sentiment analysis may be applied beyond the Jane Austen example. One possible corpus for this extended portion may be news article text retrieved via the New York Times API. Secondly, at least one additional sentiment lexicon will be incorporated so that the sentiment results may be compared across differing classification or scoring approaches. In this, the extended portion of the assignment will not only apply the workflow to new data, but will also examine how the choice of lexicon may influence the resulting interpretation.
+
+## Proposed Plan
+
+The analytical approach will likely follow the outlined steps below.
+
+Firstly, the example code from Chapter 2 will be reproduced within this Quarto document, ensuring that it runs successfully and that the original source is properly cited. Subsequently, a second text corpus will be obtained and transformed into a tidy structure suitable for text mining. If the New York Times API is used, relevant article text fields such as headlines, abstracts, or snippets will be extracted for analysis. Sentiment analysis will then be conducted on this second corpus, initially using the same general approach as the original example, and thereafter with an additional sentiment lexicon. Finally, the resulting outputs will be compared in order to identify any notable differences in sentiment patterns, classifications, or overall interpretation.
+
+## Potential Challenges
+
+One expected challenge involves selecting a second corpus that is both manageable and suitable for meaningful comparison. Moreover, because different sentiment lexicons do not all measure sentiment in the same manner, some care will be required when interpreting differences across the results.
+
+# References:
+
+Wickham, H., & Silge, J. (2017). *Text mining with R: A tidy approach*. O’Reilly Media. <https://www.tidytextmining.com/>
