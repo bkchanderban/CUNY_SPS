@@ -1,0 +1,43 @@
+---
+title: "week_10B_nobel_prize"
+author: "Brandon Chanderban"
+date:   "April 15, 2026"
+format:
+  html:
+    toc: true
+    code-fold: show
+    theme: flatly
+execute:
+  echo:    true
+  warning: false
+---
+
+# Introduction/Approach
+
+For this assignment, the Nobel Prize public API will be utilized to retrieve structured JSON data pertaining to Nobel laureates and prize awards. The API provides endpoints that return detailed information on laureates, including their names, gender, birth countries, affiliations, prize categories, and award years.
+
+## Data Retrieval and Preparation
+
+The first step in the process will involve making API calls directly within R using packages such as httr (or httr2) and jsonlite. The JSON responses will then be parsed and converted into R data frames using fromJSON().
+
+Since the data is nested, additional steps will be required to properly unnest and tidy the data into a format suitable for analysis. This will involve the use of tidyverse tools such as dplyr and tidyr, including functions like unnest() and pivot_longer() where necessary.
+
+## Research Questions
+
+Once the data is cleaned and structured, it will then be explored to identify meaningful patterns and relationships. Based on this exploration, the following four questions will be investigated:
+
+1.  How many individuals have received more than one Nobel Prize?
+
+2.  Which countries have produced the most Nobel laureates, based on country of birth?
+
+3.  Which Nobel Prize categories have shown the most growth in the number of awards over time?
+
+4.  How has the gender distribution of Nobel laureates changed over time?
+
+These questions were selected to provide a mix of basic aggregation, categorical comparison, and time-based analysis. In particular, the third and fourth questions require examining trends across multiple variables (such as year, category, and gender), going beyond simple counts.
+
+## Analysis and Presentation
+
+For each question, the objective will be clearly stated, the R code utilized to manipulate and analyze the data will be provided, and the results will be presented using appropriate outputs such as tables or visualizations created with ggplot2. The findings will then be interpreted in order to highlight any notable trends or insights.
+
+This approach ensures that the workflow remains reproducible, transparent, and aligned with tidy data principles, while also demonstrating the ability to work with nested JSON data and perform meaningful data analysis.
