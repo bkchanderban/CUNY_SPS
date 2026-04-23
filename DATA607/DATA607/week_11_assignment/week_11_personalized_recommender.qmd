@@ -1,0 +1,41 @@
+---
+title: "week_11_personalized_recommender"
+author: "Brandon Chanderban"
+date:   "April 23, 2026"
+format:
+  html:
+    toc: true
+    code-fold: show
+    theme: flatly
+execute:
+  echo:    true
+  warning: false
+---
+
+# Introduction/Approach
+
+The objective of this assignment is to build a personalized recommendation system using the same movie ratings dataset employed in the Week 3A Global Baseline Estimate project. Whereas the prior assignment produced non-personalized recommendations based on overall average ratings and bias terms, the present assignment calls for a recommender that generates outputs tailored to the preferences of individual users.
+
+Therefore, to achieve the aforementioned, the personalized recommendation algorithm that will likely be implemented is user-to-user collaborative filtering. This method works by identifying users with similar rating patterns and using those similarities to estimate how a target user may score movies they have not yet rated.
+
+## Data Preparation
+
+As with the previous assignment, the movie ratings dataset provided by Professor Catlin will be used. The dataset is arranged in a wide format, where each row represents a user and each column represents a movie, with missing values indicating unrated items.
+
+The data will first be imported into R and reshaped into a long format using functions such as pivot_longer(), producing variables such as user, movie, and rating. The long-format data will then be converted into a user-item matrix for collaborative filtering.
+
+## Recommendation Method
+
+The user-to-user collaborative filtering model will measure similarity between users based on the movies they have both rated. Similarity may be calculated using a metric such as Pearson correlation or cosine similarity.
+
+Once the similarity scores are determined, the most similar users will be identified, and their ratings will be used to estimate ratings for unseen movies for a target user. The recommender output will likely take the form of a top-N list of recommended movies for each user, based on the highest predicted ratings.
+
+## Evaluation Plan
+
+To evaluate the recommender, a portion of the ratings data will likely be held out and treated as test data. The recommender's predicted ratings may then be compared against the actual ratings using a metric such as RMSE or MAE.
+
+Additionally, the resulting top-N recommendations may be reviewed to determine whether they appear reasonable and personalized.
+
+## Potential Challenges
+
+One anticipated challenge is the sparsity of the ratings matrix, since users may not have rated many of the same movies. This could make the similarity calculations less stable. Another possible challenge is the relatively small size of the ratings dataset, which may limit the effectiveness of collaborative filtering.
