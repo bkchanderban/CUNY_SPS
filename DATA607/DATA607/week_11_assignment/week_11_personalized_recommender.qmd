@@ -39,3 +39,168 @@ Additionally, the resulting top-N recommendations may be reviewed to determine w
 ## Potential Challenges
 
 One anticipated challenge is the sparsity of the ratings matrix, since users may not have rated many of the same movies. This could make the similarity calculations less stable. Another possible challenge is the relatively small size of the ratings dataset, which may limit the effectiveness of collaborative filtering.
+
+# Code Base/Body
+
+The first step, as with most of our analytical tasks in RStudio, will call for the loading of the required libraries. In this assignment, the tidyverse package will be used for data preparation, while the recommenderlab package will be used to construct the personalized recommender system.
+
+```{r import-libraries}
+
+library(tidyverse)
+library(recommenderlab)
+```
+
+## Importing the Movie Ratings Data
+
+Subsequently, we must import the movie ratings dataset into our working environment. As with the previous Global Baseline Estimate assignment, the dataset originates from the critic movie ratings file provided by Professor Catlin.
+
+```{r import-movie-ratings}
+
+url <- "https://raw.githubusercontent.com/bkchanderban/CUNY_SPS/refs/heads/main/DATA607/DATA607/week_3A_assignment/MovieRatings.csv"
+
+raw_ratings <- read.csv(url, stringsAsFactors = FALSE)
+
+glimpse(raw_ratings)
+```
+
+At this stage, the dataset remains in its original wide format, where each row represents a critic/user, each column represents a movie, and each cell contains the rating that the given user assigned to the corresponding movie. Missing values indicate movies that were not rated by that user.
+
+## Preparing the Ratings Matrix
+
+For collaborative filtering, the data must be placed into a user-item matrix, where rows represent users and columns represent movies. Since the imported dataset is already mostly arranged in this structure, the main preparation step entails separating the user names from the numeric movie ratings and converting the ratings portion into a matrix.
+
+```{r prepare-ratings-matrix}
+
+ratings_matrix <- raw_ratings %>%
+  column_to_rownames("Critic") %>%
+  as.matrix()
+
+ratings_matrix <- apply(ratings_matrix, 2, as.numeric)
+
+rownames(ratings_matrix) <- raw_ratings$Critic
+
+ratings_matrix
+```
+
+The resulting matrix now contains users as rows, movies as columns, and ratings as the matrix values. This structure is now suitable for conversion into a recommenderlab rating matrix object.
+
+## Converting to a Recommenderlab Object
+
+The recommenderlab package requires the ratings data to be stored as a realRatingMatrix. This format is designed specifically for user-item rating data and allows recommender algorithms to be applied more directly.
+
+```{r convert-to-recommenderlab-object}
+
+ratings_rrm <- as(ratings_matrix, "realRatingMatrix")
+
+ratings_rrm
+```
+
+At this stage, the movie ratings data has been converted into the required structure for building a personalized recommender system.
+
+## Building the User-Based Collaborative Filtering Model
+
+The personalized recommendation method used in this assignment will be user-to-user collaborative filtering. This method identifies users with similar rating patterns and then uses those similarities to recommend items that the target user has not yet rated.
+
+```{r construct-col-filtering-model}
+
+ubcf_model <- Recommender(
+  data = ratings_rrm,
+  method = "UBCF",
+  parameter = list(method = "Pearson", nn = 5)
+)
+
+ubcf_model
+```
+
+In this model, Pearson correlation was used to measure the similarity between users. The nn = 5 argument indicates that the model will consider up to five nearest neighbors when generating recommendations.
+
+## Generating Top-N Recommendations
+
+Once the model has been built, it can be used to generate personalized recommendations. In this case, the recommender will output the top three recommended movies for each user.
+
+```{r generate-top-n-recommendations}
+
+top_n_recommendations <- predict(
+  ubcf_model,
+  newdata = ratings_rrm,
+  n = 3
+)
+
+top_n_recommendations
+```
+
+Initially, the recommendation output is stored in a recommenderlab-specific format. To make the results easier to inspect, the recommendations can be converted into a list.
+
+```{r convert-recommendations-to-list}
+
+# Convert to list
+recommendations_list <- as(top_n_recommendations, "list")
+
+# Assign row names from original dataset to recommendation list
+names(recommendations_list) <- rownames(ratings_matrix)
+
+# Convert to dataframe for cleaner design
+recommendations_df <- data.frame(
+  Critic = names(recommendations_list),
+  Recommended_Movies = sapply(recommendations_list, toString),
+  row.names = NULL
+)
+
+recommendations_df
+```
+
+## Evaluating the Model
+
+To evaluate the recommender, a hold-out evaluation approach will be used. In this method, a portion of the known ratings will be withheld from the model and then predicted after training. The predicted ratings will then be compared against the withheld ratings using accuracy measures such as RMSE and MAE.
+
+```{r evaluate-recommender}
+
+set.seed(6767)
+
+evaluation_scheme <- evaluationScheme(
+  ratings_rrm,
+  method = "split",
+  train = 0.8,
+  given = -1,
+  goodRating = 4
+)
+
+ubcf_eval <- Recommender(
+  getData(evaluation_scheme, "train"),
+  method = "UBCF",
+  parameter = list(method = "Pearson", nn = 5)
+)
+
+ubcf_predictions <- predict(
+  ubcf_eval,
+  getData(evaluation_scheme, "known"),
+  type = "ratings"
+)
+
+accuracy <- calcPredictionAccuracy(
+  ubcf_predictions,
+  getData(evaluation_scheme, "unknown")
+)
+
+accuracy
+```
+
+The warning indicates that one user (user 8 in the matrix) did not have enough ratings for the hold-out evaluation. This is not unexpected, given the small and sparse nature of the dataset.
+
+The model produced an RMSE of 0.703 and an MAE of 0.472, meaning that the predicted ratings differed from the actual held-out ratings by roughly 0.5 to 0.7 points on average. As such, the recommender shows some predictive ability, although the results should be interpreted with caution due to the limited size of the ratings dataset.
+
+# Conclusion/Interpretation of Recommendation Output
+
+The recommendations_df table presents the personalized movie recommendations generated through user-to-user collaborative filtering. The model recommends movies that each critic has not yet rated, based on the preferences of other users with similar rating patterns.
+
+Some critics received recommendations, such as **Dieudonne** being recommended **JungleBook, Frozen, and PitchPerfect2**, and **Shipra** being recommended **CaptainAmerica, Deadpool, and PitchPerfect2**. These results suggest that the model was able to identify comparable users and use their ratings to generate personalized suggestions.
+
+However, several critics received no recommendations. This may be because some had already rated most or all of the available movies, leaving few unseen items to recommend. In other cases, the user may not have had enough overlapping ratings with others for the model to identify reliable similarities. This is expected given the small size and sparsity of the dataset.
+
+The evaluation results also support this cautious interpretation. While the RMSE and MAE values suggest that the recommender had some predictive ability, the warning generated during evaluation highlights the limitations caused by limited user ratings and sparse overlap.
+
+In conclusion, the personalized recommender system was able to generate meaningful recommendations for several users, while also highlighting the limitations of collaborative filtering when applied to a small and sparse dataset.
+
+## LLM Used
+
+-   OpenAI. (2026). *ChatGPT (Version 4o)* \[Large language model\]. [https://chat.openai.com](https://chat.openai.com/) . Accessed April 25, 2026.
