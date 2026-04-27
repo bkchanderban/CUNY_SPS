@@ -1,5 +1,5 @@
 ---
-title: "Netlfix Recommender System Discussion"
+title: "Netflix Recommender System Discussion"
 author: "Brandon Chanderban"
 date:   "April 26th, 2026"
 format: 
