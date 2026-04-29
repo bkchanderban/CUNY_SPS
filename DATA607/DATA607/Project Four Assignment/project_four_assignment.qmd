@@ -1,0 +1,45 @@
+---
+title: "Project Four - Document Classification"
+author: "Brandon Chanderban"
+date:   "April 29th, 2026"
+format:
+  html:
+    toc: true
+    code-fold: show
+    theme: flatly
+execute:
+  echo:    true
+  warning: false
+---
+
+# Introduction/Approach
+
+The objective of this assignment is to build a document classification model that can predict whether an email should be classified as spam or ham. For this project, the SpamAssassin Public Corpus (Apache SpamAssassin Project, n.d.) will likely be used, since it already contains labeled spam and non-spam email messages.
+
+## Data Preparation
+
+The spam and ham files will first be downloaded and extracted. Each email will then be imported into R and assigned a label based on its folder classification.
+
+-   spam = 1
+
+-   ham = 0
+
+The text will then be cleaned by removing unnecessary punctuation, numbers, stopwords, and extra whitespace. After preprocessing, the emails will be converted into a Document-Term Matrix, where each row represents an email and each column represents a term.
+
+## Model Construction
+
+A predictive classifier will then be trained on the labeled email data. One likely method is Naive Bayes, since it is commonly used for text classification and spam filtering.
+
+## Evaluation Plan
+
+The data will be split into training and testing sets. The model will be trained on the training set and evaluated on the withheld test set using measures such as accuracy, precision, recall, and F1-score.
+
+Particular attention will be paid to false positives and false negatives, since legitimate emails being classified as spam, or spam emails being missed, would both affect the usefulness of the classifier.
+
+## Potential Challenges
+
+One possible challenge is that spam messages may use varied or misleading language, making classification more difficult. Another challenge is balancing the tradeoff between catching spam and avoiding the incorrect classification of legitimate emails.
+
+## References:
+
+-   Apache SpamAssassin Project. (n.d.). *Public corpus*. <https://spamassassin.apache.org/old/publiccorpus/>
