@@ -40,6 +40,218 @@ Particular attention will be paid to false positives and false negatives, since 
 
 One possible challenge is that spam messages may use varied or misleading language, making classification more difficult. Another challenge is balancing the tradeoff between catching spam and avoiding the incorrect classification of legitimate emails.
 
+# Code Base/Body
+
+Due to file size constraints and the desire to foster reproducibility within the analysis, the separate spam and ham data folders were first combined into a single CSV file. This consolidated dataset was then uploaded to my personal GitHub repository so that it could be accessed directly through a raw GitHub URL, rather than relying on local file paths.
+
+## Loading the Required Libraries
+
+As with most analyses conducted in RStudio, the first step involves loading the required libraries. In this project, the tidyverse and tidytext packages will be used for data preparation and text processing, while e1071 and caret will assist with the Naive Bayes classifier and model evaluation.
+
+```{r load-libraries}
+
+library(tidyverse)
+library(tidytext)
+library(e1071)
+library(caret)
+library(rsample)
+```
+
+## Importing the Spam/Ham Dataset
+
+The dataset will now be imported from the raw GitHub URL. This dataset contains the original email file name, the email text, and a label indicating whether the message is spam or ham.
+
+```{r import-spam-ham-dataset}
+
+url <- "https://raw.githubusercontent.com/bkchanderban/CUNY_SPS/refs/heads/main/DATA607/DATA607/Project%20Four%20Assignment/spam_ham_email_dataset.csv"
+
+email_data <- read_csv(url)
+
+glimpse(email_data)
+
+table(email_data$label)
+```
+
+At this stage, the dataset has been successfully imported. The label variable identifies the already-classified email type, which will be used to train the classifier.
+
+## Preparing the Data
+
+Before the text can be modeled, a document identifier will be created and the label variable will be converted into a factor. This will make it easier to track each email during tokenization and modeling.
+
+```{r prepare-data-further}
+
+email_data <- email_data %>%
+  mutate(
+    doc_id = row_number(),
+    label = factor(label, levels = c("ham", "spam"))
+  )
+
+glimpse(email_data)
+```
+
+## Splitting the Data into Training and Testing Sets
+
+The data will now be split into training and testing sets. The training set will be used to build the model, while the testing set will be withheld and used to evaluate how well the classifier performs on unseen emails.
+
+```{r split-the-data}
+
+set.seed(6767)
+
+email_split <- initial_split(email_data, prop = 0.80, strata = label)
+
+train_data <- training(email_split)
+test_data <- testing(email_split)
+
+table(train_data$label)
+table(test_data$label)
+```
+
+This split allows the classifier to learn from one portion of the data and then be evaluated on a separate portion.
+
+## Tokenizing and Cleaning the Data
+
+The next step involves converting the email text into individual words. Common stopwords, numbers, and non-alphabetic tokens will be removed so that the model focuses more heavily on meaningful terms.
+
+```{r tokenize-and-clean-the-dataset}
+
+train_tokens <- train_data %>%
+  unnest_tokens(word, text) %>%
+  anti_join(stop_words, by = "word") %>%
+  filter(str_detect(word, "^[a-z]+$")) %>%
+  count(doc_id, label, word, sort = TRUE)
+
+head(train_tokens)
+```
+
+At this stage, the training emails have been converted into a tidy word-level format.
+
+## Selecting the Most Common Terms
+
+To keep the model manageable, the most frequent terms from the training data will be selected as the model vocabulary.
+
+```{r select-the-most-common-terms}
+
+top_terms <- train_tokens %>%
+  group_by(word) %>%
+  summarise(total_count = sum(n), .groups = "drop") %>%
+  slice_max(total_count, n = 1000)
+
+vocabulary <- top_terms$word
+
+head(top_terms)
+```
+
+Limiting the vocabulary helps reduce noise and prevents the model from becoming unnecessarily large.
+
+## Creating Document-Term Matrices
+
+The cleaned tokens will now be converted into a document-term structure. In this format, each row represents an email, each column represents a word, and the cell values represent how many times that word appears in the email.
+
+```{r create-document-term-matrices}
+
+create_feature_matrix <- function(data, vocabulary) {
+  features <- data %>%
+    select(doc_id, label, text) %>%
+    unnest_tokens(word, text) %>%
+    anti_join(stop_words, by = "word") %>%
+    filter(str_detect(word, "^[a-z]+$")) %>%
+    filter(word %in% vocabulary) %>%
+    count(doc_id, word) %>%
+    pivot_wider(
+      names_from = word,
+      values_from = n,
+      values_fill = 0
+    )
+  
+  features <- data %>%
+    select(doc_id, label) %>%
+    left_join(features, by = "doc_id") %>%
+    mutate(across(-c(doc_id, label), ~replace_na(.x, 0)))
+  
+  missing_terms <- setdiff(vocabulary, names(features))
+  
+  for(term in missing_terms) {
+    features[[term]] <- 0
+  }
+  
+  features %>%
+    select(doc_id, label, all_of(vocabulary))
+}
+```
+
+```{r create-feature-matrix-for-train-and-test-data}
+
+train_features <- create_feature_matrix(train_data, vocabulary)
+test_features <- create_feature_matrix(test_data, vocabulary)
+
+head(train_features)
+head(test_features)
+```
+
+The training and testing datasets are now represented in a structure suitable for classification.
+
+## Building the Naive Bayes Classifier
+
+A Naive Bayes classifier will now be trained using the document-term features. This method is commonly used for spam filtering because it estimates the probability that an email belongs to a particular class based on the words it contains.
+
+```{r construct-the-naive-bayes-classifier}
+
+train_model_data <- train_features %>%
+  select(-doc_id)
+
+test_model_data <- test_features %>%
+  select(-doc_id)
+
+nb_model <- naiveBayes(label ~ ., data = train_model_data)
+```
+
+The model has now learned patterns in the training data that are associated with spam and ham emails.
+
+## Generating Predictions
+
+The trained model will now be used to predict whether the emails in the testing set should be classified as spam or ham.
+
+```{r execute-predictions}
+
+nb_predictions <- predict(
+  nb_model,
+  newdata = test_model_data
+)
+
+head(nb_predictions)
+```
+
+The predictions represent the model’s classification of the withheld test emails.
+
+## Evaluating the Classifier
+
+The model’s predictions will now be compared against the actual labels from the test set. This will allow for evaluation using accuracy, sensitivity, specificity, and other classification metrics.
+
+```{r evaluate-the-classifier-performance}
+
+confusion_results <- confusionMatrix(
+  nb_predictions,
+  test_model_data$label,
+  positive = "spam"
+)
+
+confusion_results
+```
+
+The confusion matrix provides insight into how well the model classified spam and ham messages, including how often it correctly identified spam and how often it misclassified legitimate messages.
+
+# Conclusion/Interpretation
+
+The Naive Bayes classifier performed well on the whole, achieving an accuracy of approximately 92.44%, indicating that the majority of emails were correctly classified.
+
+More specifically, the model had a sensitivity of 83.93% and a specificity of 97.20%, meaning that it was stronger at correctly identifying ham emails than spam emails. This is reflected in the confusion matrix, where 45 spam emails were incorrectly classified as ham (false negatives), compared to 14 ham emails incorrectly classified as spam (false positives).
+
+As such, this suggests that the model is somewhat conservative, prioritizing the avoidance of misclassifying legitimate emails as spam, although this comes at the cost of allowing some spam messages to pass through.
+
 ## References:
 
 -   Apache SpamAssassin Project. (n.d.). *Public corpus*. <https://spamassassin.apache.org/old/publiccorpus/>
+
+## LLM Used
+
+-   OpenAI. (2026). *ChatGPT (Version 4o)* \[Large language model\]. [https://chat.openai.com](https://chat.openai.com/) . Accessed April 29, 2026.
