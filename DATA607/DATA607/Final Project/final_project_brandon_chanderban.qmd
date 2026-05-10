@@ -1,0 +1,411 @@
+---
+title: "Final Project: Analyzing Factors Contributing to Aviation Accident Severity"
+author: "Brandon Chanderban"
+date:   "May 9, 2026"
+format:
+  html:
+    toc: true
+    code-fold: show
+    theme: flatly
+execute:
+  echo:    true
+  warning: false
+---
+
+# Abstract
+
+This project examines historical aviation accident data to explore factors associated with the severity of crash outcomes. The analysis combines a structured Kaggle aviation accident dataset with historical weather data retrieved through the Open-Meteo Historical Weather API. Since the accident dataset stores locations as free-text rather than geographic coordinates, the workflow involved narrowing the dataset to clearer location records, applying geocoding to obtain latitude and longitude values, and using those coordinates to retrieve weather variables such as mean temperature, precipitation, and maximum wind speed.
+
+The analysis then used feature engineering, exploratory visualization, and linear regression modeling to examine relationships between fatality rate and selected variables, including persons aboard, year, and weather conditions. The results showed that fatality rates were generally high within the retained dataset, although a slight downward trend appeared over time. The regression model was statistically significant, but its adjusted R-squared value suggested that it explained only a modest portion of variation in fatality rate. Persons aboard and mean temperature were statistically significant within the model, though the persons aboard result should be interpreted cautiously because fatality rate was calculated using the persons aboard variable.
+
+As such, the findings suggest that aviation accident severity is associated with multiple interacting factors beyond the limited variables included in this analysis. The project also demonstrates a reproducible workflow through Quarto and RStudio, including data cleaning, API integration, regression analysis, and presentation generation.
+
+# Introduction
+
+This project examines historical aviation accident data to explore factors that may be associated with the severity of crash outcomes. The topic was selected due to the increased public attention surrounding aviation crashes, near misses, and other safety-related incidents. While this attention may reflect increased reporting rather than an actual rise in incidents, it still provides a useful motivation for examining historical crash data more closely.
+
+The analysis uses two different data source types: a structured [Kaggle CSV containing aviation accident records](https://www.kaggle.com/datasets/saurograndi/airplane-crashes-since-1908) and API-based historical weather data from [Open-Meteo](https://open-meteo.com/en/docs/historical-weather-api). Since the Kaggle dataset stores locations as free-text entries rather than coordinates, the workflow will involve narrowing the dataset to usable records, applying geocoding, retrieving weather variables, and then using exploratory analysis and regression modeling to examine patterns in accident severity.
+
+# Code Base / Body
+
+The first step involves loading the packages needed for data cleaning, geocoding, API access, visualization, and regression analysis.
+
+```{r load-libraries}
+
+library(tidyverse)
+library(lubridate)
+library(httr2)
+library(jsonlite)
+library(tidygeocoder)
+library(broom)
+library(scales)
+```
+
+## Importing the Aviation Accident Dataset
+
+The aviation accident dataset was first downloaded from Kaggle and then uploaded to a personal GitHub repository. This allows the dataset to be imported directly through the raw GitHub URL, making the workflow more reproducible and avoiding references to any local file paths.
+
+```{r import-aviation-accident-data}
+
+aviation_url <- "https://raw.githubusercontent.com/bkchanderban/CUNY_SPS/refs/heads/main/DATA607/DATA607/Final%20Project/airplane_crashes_and_fatalities_since_1908.csv"
+
+aviation_raw <- read.csv(aviation_url)
+
+glimpse(aviation_raw)
+```
+
+At this stage, the dataset remains in its original imported form. The next step will involve inspecting the variable names and cleaning the date, location, and numeric fields for the analysis.
+
+## Inspecting and Preparing the Dataset
+
+Before our analysis can be executed, the structure of the dataset must first be inspected in order to identify the variables required for the project's scope. Particular attention will be given to the date, location, persons aboard, and fatality-related fields, since these variables will later be used for feature engineering, geocoding, weather integration, and regression analysis.
+
+```{r conduct-data-inspection}
+
+names(aviation_raw)
+summary(aviation_raw)
+```
+
+## Cleaning and Transforming the Dataset
+
+Before beginning the exploratory analysis, several variables must first be cleaned and transformed into formats more suitable for analysis. In particular, the date field must be converted into a usable date format, while additional variables such as year and fatality rate will later be derived through feature engineering.
+
+```{r conduct-data-cleaning-and-transformation}
+
+aviation_clean <- aviation_raw %>%
+  # Convert date column into date format
+  mutate(
+    Date = mdy(Date),
+    #Create Year variable
+    Year = year(Date)
+  ) %>%
+  # Restrict data to years with more reliable weather coverage
+  filter(Year >= 1940)
+
+glimpse(aviation_clean)
+```
+
+Consequently, the dataset has been narrowed to records occurring from 1940 onward, since the historical weather API used downstream in the analysis provides more reliable coverage for this period. In addition, a separate year variable has been extracted from the original date field to support later trend analysis and regression modeling.
+
+## Preparing Location Data for Geocoding
+
+Since the weather API requires latitude and longitude coordinates, the location field must first be cleaned before geocoding can be performed. Several records contain vague or incomplete entries such as references to oceans, gulfs, or airborne locations, which are unlikely to return reliable coordinates. As such, part of the preparation process will involve removing overly ambiguous locations and standardizing the remaining entries where possible.
+
+```{r prepare-location-data}
+
+aviation_locations <- aviation_clean %>%
+  
+  # Remove rows with missing locations
+  filter(!is.na(Location)) %>%
+  
+  # Remove vague or unusable location entries
+  filter(
+    !str_detect(Location, regex(
+      "Ocean|Sea|Gulf|River|Unknown|Near|Off",
+      ignore_case = TRUE
+    ))
+  ) %>%
+  
+  # Standardize spacing
+  mutate(
+    Location = str_squish(Location)
+  )
+
+# Preview cleaned locations
+aviation_locations %>%
+  select(Location) %>%
+  slice_head(n = 10)
+```
+
+Now, the dataset has been narrowed to records containing more usable geographic information. While some location inconsistencies may still remain, this cleaning step helps improve the likelihood of obtaining successful coordinate matches during the geocoding process.
+
+## Geocoding the Aviation Accident Data Locations
+
+After cleaning the location field, the next step involves converting the remaining location entries into geographic coordinates. This process, known as geocoding, allows latitude and longitude values to be assigned to each accident record so that historical weather data can later be retrieved through the Open-Meteo API.
+
+```{r geocode-the-accident-locations, eval=FALSE}
+
+aviation_geocoded <- aviation_locations %>%
+  # Retrieve latitude and longitude coordinates
+  geocode(
+    address = Location,
+    method = "osm",
+    lat = latitude,
+    long = longitude
+  )
+```
+
+Since the geocoding process can take a significant amount of time to complete, the completed geocoded dataset was saved and uploaded to GitHub. The geocoding chunk above is therefore retained to show the method, but is not evaluated during rendering.
+
+### Importing the Saved Geocoded Dataset
+
+The saved geocoded dataset is imported from GitHub so that the remaining analysis can be reproduced without repeatedly sending requests to the geocoding service.
+
+```{r import-thesaved-geocoded-dataset}
+
+geocoded_url <- "https://raw.githubusercontent.com/bkchanderban/CUNY_SPS/refs/heads/main/DATA607/DATA607/Final%20Project/aviation_geocoded.csv"
+
+aviation_geocoded <- read.csv(geocoded_url)
+
+aviation_geocoded %>%
+  select(Location, latitude, longitude) %>%
+  slice_head(n = 10)
+
+nrow(aviation_geocoded)
+```
+
+### Removing the Records Without Coordinates
+
+Although most of the locations were successfully geocoded, some records did not return usable latitude or longitude values due to ambiguous or incomplete location descriptions. Since geographic coordinates are required for retrieving historical weather data, these records will be excluded from the weather integration stage.
+
+```{r remove-missing-coordinates}
+
+aviation_geocoded <- aviation_geocoded %>%
+  filter(
+    !is.na(latitude),
+    !is.na(longitude)
+  )
+
+nrow(aviation_geocoded)  
+```
+
+## Feature Engineering
+
+After narrowing the dataset to records with usable coordinates, additional variables will be created to support the analysis. These include fatality rate, survival count, decade, and a binary fatal accident indicator. These variables help translate the original crash records into measures that can be used for exploratory analysis and regression modeling.
+
+```{r conduct-feature-engineering}
+
+aviation_features <- aviation_geocoded %>%
+  mutate(
+    fatality_rate = Fatalities / Aboard,
+    survival_count = Aboard - Fatalities,
+    decade = floor(Year/10) * 10,
+    fatal_accident = if_else(Fatalities > 0, 1, 0)
+  ) %>%
+  filter(
+    !is.na(Aboard),
+    !is.na(Fatalities),
+    Aboard > 0,
+    fatality_rate >= 0,
+    fatality_rate <= 1
+  )
+
+glimpse(aviation_features)
+```
+
+Following the feature engineering process, the dataset contains several derived variables that will be used throughout the remainder of the analysis. The fatality rate is particularly important because it allows accident severity to be examined relative to the number of persons aboard rather than only through raw fatality counts.
+
+### Checking the Engineered Variables
+
+Before moving into the exploratory analysis, the newly created variables can be summarized to ensure that they were calculated as expected.
+
+```{r check-engineered-variables}
+
+aviation_features %>%
+  select(Aboard, Fatalities, fatality_rate, survival_count, decade, fatal_accident) %>%
+  summary()
+```
+
+The engineered variables appear to have been generated successfully. The summary statistics indicate that many accidents within the dataset resulted in high fatality rates, with the median fatality rate equaling 1.0, suggesting that at least half of the retained accidents resulted in no survivors. In addition, the fatal_accident indicator itself shows that the overwhelming majority of retained records involved at least one fatality. These results are not entirely unexpected, since more severe accidents are generally more likely to be documented historically than minor incidents.
+
+## Weather API Integration
+
+The next stage of the workflow involves retrieving historical weather information for each aviation accident. Since the Open-Meteo Historical Weather API accepts latitude, longitude, and date values, the geocoded accident records can now be used to request weather information for the corresponding accident date and location. The selected weather variables include mean temperature, precipitation sum, and maximum wind speed.
+
+```{r define-weather-api-function}
+
+get_weather_data <- function(latitude, longitude, date) {
+  
+  request_url <- "https://archive-api.open-meteo.com/v1/archive"
+  
+  tryCatch({
+    
+    response <- request(request_url) %>%
+      req_url_query(
+        latitude = latitude,
+        longitude = longitude,
+        start_date = as.character(date),
+        end_date = as.character(date),
+        daily = "temperature_2m_mean,precipitation_sum,wind_speed_10m_max",
+        timezone = "auto"
+      ) %>%
+      req_perform()
+    
+    weather_json <- response %>%
+      resp_body_json()
+    
+    tibble(
+      weather_date = weather_json$daily$time[[1]],
+      temperature_mean = weather_json$daily$temperature_2m_mean[[1]],
+      precipitation_sum = weather_json$daily$precipitation_sum[[1]],
+      wind_speed_max = weather_json$daily$wind_speed_10m_max[[1]]
+    )
+    
+  }, error = function(e) {
+    
+    tibble(
+      weather_date = as.character(date),
+      temperature_mean = NA_real_,
+      precipitation_sum = NA_real_,
+      wind_speed_max = NA_real_
+    )
+  })
+}
+```
+
+Before applying the function to all records, it will first be tested on one row to ensure that the API returns the expected structure.
+
+```{r test-weather-api-function}
+
+test_weather <- get_weather_data(
+  latitude = aviation_features$latitude[1],
+  longitude = aviation_features$longitude[1],
+  date = aviation_features$Date[1]
+)
+
+test_weather
+```
+
+The test API call returned a valid weather record for the selected accident date and location. This confirms that the function can retrieve the daily weather variables needed for the analysis.
+
+### Retrieving Weather Data for All Records
+
+The function is then applied to the full geocoded dataset. Since this requires many API calls, this chunk should be treated as a one-time execution step. Once completed, the weather-enriched dataset will be saved and uploaded to GitHub so that the full Quarto document can later be rendered without repeating the API requests.
+
+```{r retrieve-weather-data-for-all-records, eval=FALSE}
+
+aviation_weather <- aviation_features %>%
+  mutate(row_id = row_number()) %>%
+  mutate(
+    weather_data = pmap(
+      list(latitude, longitude, Date),
+      get_weather_data
+    )
+  ) %>%
+  unnest(weather_data)
+```
+
+### Importing the Weather-Enriched Data
+
+Since retrieving the weather data for all records requires repeated API calls, the completed weather-enriched dataset is imported directly from GitHub for reproducibility purposes.
+
+```{r import-weather-enriched-dataset}
+
+weather_url <- "https://raw.githubusercontent.com/bkchanderban/CUNY_SPS/refs/heads/main/DATA607/DATA607/Final%20Project/aviation_weather_enriched.csv"
+
+aviation_weather <- read.csv(weather_url)
+```
+
+```{r examine-retrieved-weather-data}
+
+glimpse(aviation_weather)
+head(aviation_weather, 5)
+```
+
+The API retrieval successfully added historical weather variables to the aviation accident records, including mean temperature, precipitation sum, and maximum wind speed. These variables will now be used alongside the engineered aviation severity measures for exploratory analysis and regression modelling.
+
+## Exploratory Analysis
+
+Before constructing a regression model, exploratory analysis will first be used to examine general patterns within the aviation accident data. Particular attention will be given to accident severity over time, as well as the potential relationship between weather conditions and fatality outcomes.
+
+### Fatality Rate Over Time
+
+The following visualization examines how fatality rates have varied across the years represented within the dataset.
+
+```{r fatality-rate-over-time}
+
+ggplot(data = aviation_weather, aes(x = Year, y = fatality_rate)) +
+ geom_jitter(alpha = 0.15, width = 0.5, height = 0.02) +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(
+    title = "Fatality Rate across Aviation Incidents Over Time",
+    x = "Year",
+    y = "Fatality Rate"
+  ) +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+The visualization indicates that many aviation accidents within the dataset resulted in very high fatality rates, with a clear concentration of observations near a fatality rate of 1.0. This suggests that the retained dataset is heavily represented by severe accidents. At the same time, the fitted trend line shows a slight downward pattern across time, which may point to gradual improvements in aviation safety, aircraft technology, and operational practices. However, the wide spread of observations also shows that accident severity continues to vary substantially across individual cases.
+
+### Wind Speed and Fatality Rate
+
+The following visualization examines the relationship between maximum wind speed and accident fatality rate.
+
+```{r wind-speed-versus-fatality-rate}
+
+ggplot(data = aviation_weather, aes(x = wind_speed_max, y = fatality_rate)) +
+  geom_point(alpha = 0.3) +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  labs(
+    title = "Wind Speed and Aviation Accident Fatality Rate",
+    x = "Maximum Wind Speed",
+    y = "Fatality Rate"
+  ) +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+The visualization shows substantial variability between wind speed and aviation accident fatality rate, indicating that wind conditions alone do not fully explain accident severity. However, the fitted trend line suggests a slight positive relationship, wherein higher wind speeds may be associated with somewhat more severe crash outcomes on average. Despite this, the broad spread of observations demonstrates that aviation accident severity is likely associated with several factors rather than wind conditions alone.
+
+## Regression Analysis
+
+After completing the exploratory analysis, a linear regression model will be constructed in order to examine whether the selected aviation and weather-related variables appear associated with aviation accident fatality rate. The response variable for the model is fatality_rate, while the explanatory variables include persons aboard, year, mean temperature, precipitation, and maximum wind speed.
+
+```{r create-linear-regression-model}
+
+fatality_model <- lm(fatality_rate ~ Aboard + Year + temperature_mean + precipitation_sum + wind_speed_max, data = aviation_weather)
+
+summary(fatality_model)
+```
+
+## Interpreting the Regression Results
+
+The regression model produced a statistically significant overall result (F-statistic p-value \< 2.2e-16), suggesting that the selected explanatory variables collectively exhibit some relationship with aviation accident fatality rate. However, the adjusted R-squared value of approximately 0.108 indicates that the model explains only a modest portion of the variability in fatality outcomes. This suggests that aviation accident severity is likely associated with additional operational, mechanical, environmental, and human-related factors not captured within the present analysis.
+
+Among the explanatory variables, the number of persons aboard displayed a statistically significant negative relationship with fatality rate (p \< 2e-16). However, this relationship should be interpreted cautiously, since the fatality rate variable was itself partially constructed using the number of persons aboard. As such, part of the observed statistical relationship may reflect the mathematical structure of the response variable rather than a purely independent operational relationship. Nevertheless, the result may still suggest that accidents involving larger commercial aircraft can exhibit somewhat lower proportional fatality outcomes on average.
+
+Mean temperature also exhibited a statistically significant negative relationship with fatality rate (p = 0.0176), although the magnitude of the relationship remained relatively small. This may suggest that colder environmental conditions are modestly associated with more severe crash outcomes, though the relationship should still be interpreted cautiously.
+
+In contrast, year (p = 0.4896), precipitation (p = 0.6531), and maximum wind speed (p = 0.3298) did not appear statistically significant within the fitted model. While the exploratory visualizations suggested that stronger wind conditions may exhibit a slight positive relationship with accident severity, the regression analysis indicates that this relationship weakens once multiple variables are considered simultaneously. This highlights the complexity of aviation accidents, where severity is likely associated with numerous interacting factors rather than any single variable alone.
+
+## Model Diagnostics
+
+After fitting the regression model, diagnostic plots were examined in order to assess whether the model residuals exhibited any major violations of linear regression assumptions. Particular attention was given to the distribution of residuals and the relationship between fitted values and residual spread.
+
+```{r regression-diagnostics}
+
+par(mfrow = c(1, 2))
+
+plot(
+  fatality_model,
+  which = 1
+)
+
+plot(
+  fatality_model,
+  which = 2
+)
+
+par(mfrow = c(1, 1))
+```
+
+The diagnostic plots suggest that the regression model captures some structure in the data, but several limitations remain. The residuals versus fitted plot shows clustering and uneven spread, while the Q-Q plot shows departures from normality, especially in the tails. This suggests that the relationship between the selected variables and fatality rate is not perfectly linear, which is expected given the complexity of aviation accident severity.
+
+# Conclusion
+
+This project examined historical aviation accident data in order to explore whether variables such as persons aboard, year, and weather conditions appeared associated with accident fatality severity. Through the integration of a structured aviation crash dataset, geocoding techniques, and API-based historical weather information, the analysis demonstrated how multiple data sources can be combined within a reproducible workflow.
+
+The exploratory analysis and regression modelling suggested that aviation accident severity is associated with substantial variability and complexity. Only some of the selected variables displayed statistically significant relationships, with the persons aboard result requiring additional caution because of how fatality rate was constructed. As such, the findings reinforce the idea that aviation accident severity is associated with numerous interacting operational, environmental, mechanical, and human-related factors rather than any single contributing condition.
+
+# References
+
+Grandi, S. (n.d.). *Airplane crashes since 1908* \[Data set\]. Kaggle. <https://www.kaggle.com/datasets/saurograndi/airplane-crashes-since-1908>
+
+Open-Meteo. (n.d.). *Historical weather API*. <https://open-meteo.com/en/docs/historical-weather-api>
+
+Wickham, H., Çetinkaya-Rundel, M., & Grolemund, G. (2023). *R for data science* (2nd ed.). O’Reilly Media. <https://r4ds.hadley.nz/>
+
+## LLM Used
+
+-   OpenAI. (2026). ChatGPT \[Large language model\]. <https://chat.openai.com/>. Accessed May 9th, 2026.
